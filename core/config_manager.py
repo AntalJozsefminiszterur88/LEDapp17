@@ -5,6 +5,8 @@ import os
 import sys
 import traceback
 
+from config import BASE_DIR
+
 # Logolás (ha a reconnect_handler elérhető)
 try:
     # Próbáljuk meg relatívan importálni
@@ -28,15 +30,9 @@ DEFAULT_SETTINGS = {
 }
 
 def _get_settings_path():
-    """ Visszaadja a beállítások fájl teljes elérési útját. """
-    if getattr(sys, 'frozen', False):
-        # Ha PyInstallerrel fagyasztva van
-        app_path = os.path.dirname(sys.executable)
-    else:
-        # Normál futtatás esetén a projekt gyökérkönyvtárát keressük meg
-        # Feltételezzük, hogy ez a fájl a 'core' mappában van
-        app_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(app_path, SETTINGS_FILE)
+    """Visszaadja a beállítások fájl teljes elérési útját."""
+    BASE_DIR.mkdir(parents=True, exist_ok=True)
+    return str(BASE_DIR / SETTINGS_FILE)
 
 def load_settings():
     """ Betölti a beállításokat a JSON fájlból. """

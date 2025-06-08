@@ -1,7 +1,16 @@
+from pathlib import Path
+
 LATITUDE = 47.4338
 LONGITUDE = 19.1931
 TIMEZONE = "UTC+2"
-CONFIG_FILE = "led_schedule.json"
+
+# Alap könyvtár: Dokumentumok/UMKGL Solutions/LEDapp
+BASE_DIR = Path.home() / "Documents" / "UMKGL Solutions" / "LEDapp"
+BASE_DIR.mkdir(parents=True, exist_ok=True)
+
+# Az ütemezés fájl teljes elérési útja
+CONFIG_FILE = str(BASE_DIR / "led_schedule.json")
+
 CHARACTERISTIC_UUID = "0000fff3-0000-1000-8000-00805f9b34fb"
 
 DAYS = ["Hétfő", "Kedd", "Szerda", "Csütörtök", "Péntek", "Szombat", "Vasárnap"]
