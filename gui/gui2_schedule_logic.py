@@ -10,7 +10,7 @@ from PySide6.QtWidgets import QMessageBox
 from PySide6.QtCore import Qt
 
 # Importáljuk a szükséges konfigurációs és backend/core elemeket
-from config import COLORS, DAYS, CONFIG_FILE
+from config import COLORS, DAYS, CONFIG_FILE, PROFILES_FILE
 from core.sun_logic import get_local_sun_info, get_hungarian_day_name, DAYS_HU
 from core.location_utils import get_sun_times # Bár itt nincs közvetlen hívás, a main_app tartalmazza
 
@@ -35,51 +35,97 @@ except Exception as e:
 
 # --- Logika Függvények ---
 
-def load_schedule_from_file(main_app):
-    """
-    Betölti az ütemezést a JSON fájlból a main_app.schedule-be.
-    Args:
-        main_app: A fő alkalmazás példánya (LEDApp_PySide).
-    """
-    default_schedule = {day: {"color": COLORS[0][0] if COLORS else "", "on_time": "", "off_time": "", "sunrise": False, "sunrise_offset": 0, "sunset": False, "sunset_offset": 0} for day in DAYS}
+def get_default_schedule():
+    """Alapértelmezett ütemezés létrehozása."""
+    return {
+        day: {
+            "color": COLORS[0][0] if COLORS else "",
+            "on_time": "",
+            "off_time": "",
+            "sunrise": False,
+            "sunrise_offset": 0,
+            "sunset": False,
+            "sunset_offset": 0,
+        }
+        for day in DAYS
+    }
+
+
+def load_profiles_from_file(main_app):
+    """Betölti az ütemezési profilokat."""
+    default_schedule = get_default_schedule()
+    default_profiles = {"Alapértelmezett": {"active": True, "schedule": default_schedule}}
+
+    if os.path.exists(PROFILES_FILE):
+        try:
+            with open(PROFILES_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            profiles = {}
+            for name, prof in data.items():
+                active = bool(prof.get("active", True))
+                sched = prof.get("schedule", {})
+                merged = {}
+                for day in DAYS:
+                    d = default_schedule[day].copy()
+                    if day in sched and isinstance(sched[day], dict):
+                        for key in d:
+                            if key in sched[day]:
+                                val = sched[day][key]
+                                if key.endswith("_offset"):
+                                    try:
+                                        d[key] = int(val)
+                                    except (ValueError, TypeError):
+                                        d[key] = 0
+                                elif isinstance(val, type(d[key])):
+                                    d[key] = val
+                    merged[day] = d
+                profiles[name] = {"active": active, "schedule": merged}
+
+            if profiles:
+                main_app.profiles = profiles
+                return
+        except Exception as e:
+            print(f"Hiba a profilok betöltésekor: {e}")
+
+    # Visszafelé kompatibilitás: régi egyprofilos fájl
+    single_schedule = default_schedule.copy()
     if os.path.exists(CONFIG_FILE):
         try:
-            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                loaded_data = json.load(f)
-            merged_schedule = {}
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
             for day in DAYS:
-                 day_data = default_schedule[day].copy()
-                 if day in loaded_data and isinstance(loaded_data[day], dict):
-                      for key in day_data:
-                           if key in loaded_data[day]:
-                                expected_type = type(day_data[key])
-                                loaded_val = loaded_data[day][key]
-                                # Speciális kezelés offset-re (mindig int legyen)
-                                if key.endswith("_offset"):
-                                     try:
-                                         day_data[key] = int(loaded_val)
-                                     except (ValueError, TypeError):
-                                         print(f"Figyelmeztetés: Érvénytelen offset érték ('{loaded_val}') a '{day}' nap '{key}' kulcsánál. 0 lesz használva.")
-                                         day_data[key] = 0 # Alapértelmezett offset hiba esetén
-                                elif isinstance(loaded_val, expected_type):
-                                     day_data[key] = loaded_val
-                                else:
-                                    print(f"Figyelmeztetés: Típuseltérés a '{day}' nap '{key}' kulcsánál. Mentett: {type(loaded_val)}, Várt: {expected_type}. Alapértelmezett használata.")
-                 merged_schedule[day] = day_data
-            main_app.schedule = merged_schedule
-
-        except json.JSONDecodeError:
-            print(f"Hiba: A {CONFIG_FILE} fájl hibás JSON formátumú. Alapértelmezett ütemezés használata.")
-            main_app.schedule = default_schedule.copy()
+                d = single_schedule[day].copy()
+                if day in loaded and isinstance(loaded[day], dict):
+                    for key in d:
+                        if key in loaded[day]:
+                            val = loaded[day][key]
+                            if key.endswith("_offset"):
+                                try:
+                                    d[key] = int(val)
+                                except (ValueError, TypeError):
+                                    d[key] = 0
+                            elif isinstance(val, type(d[key])):
+                                d[key] = val
+                single_schedule[day] = d
         except Exception as e:
-            print(f"Hiba a schedule betöltésekor: {e}. Alapértelmezett ütemezés használata.")
-            main_app.schedule = default_schedule.copy()
-    else:
-         print(f"Nincs mentett schedule ({CONFIG_FILE}), alapértelmezett ütemezés használata.")
-         main_app.schedule = default_schedule.copy()
+            print(f"Hiba a régi ütemezés betöltésekor: {e}")
+
+    main_app.profiles = {"Alapértelmezett": {"active": True, "schedule": single_schedule}}
 
 
-def save_schedule(gui_widget):
+def _save_profiles_to_file(main_app):
+    """Segédfüggvény a profilok mentéséhez."""
+    try:
+        with open(PROFILES_FILE, "w", encoding="utf-8") as f:
+            json.dump(main_app.profiles, f, ensure_ascii=False, indent=4)
+        return True
+    except Exception as e:
+        print(f"Hiba a profilok mentésekor: {e}")
+        return False
+
+
+def save_profile(gui_widget):
     """
     Elmenti az aktuális ütemezési beállításokat JSON fájlba a GUI widgetek alapján.
     Args:
@@ -138,118 +184,93 @@ def save_schedule(gui_widget):
         return
 
     try:
-        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-            json.dump(schedule_to_save, f, ensure_ascii=False, indent=4)
-        QMessageBox.information(gui_widget, "Mentés sikeres", "Az ütemezés sikeresen elmentve.")
-        # Frissítjük az app belső állapotát is a mentett adatokkal
-        gui_widget.main_app.schedule = schedule_to_save
-        # Újra ellenőrizzük az ütemezést a friss adatokkal
-        check_schedule(gui_widget)
+        profile_name = getattr(gui_widget, "current_profile_name", None)
+        if not profile_name:
+            QMessageBox.critical(gui_widget, "Hiba", "Nincs kiválasztott profil a mentéshez.")
+            return
+
+        gui_widget.main_app.profiles[profile_name]["schedule"] = schedule_to_save
+        if _save_profiles_to_file(gui_widget.main_app):
+            QMessageBox.information(gui_widget, "Mentés sikeres", "Az ütemezés sikeresen elmentve.")
+            gui_widget.main_app.schedule = schedule_to_save
+        else:
+            QMessageBox.critical(gui_widget, "Mentési hiba", "Nem sikerült a profilok mentése.")
     except Exception as e:
-        QMessageBox.critical(gui_widget, "Mentési hiba", f"Hiba történt a fájl írása során: {e}")
+        QMessageBox.critical(gui_widget, "Mentési hiba", f"Hiba történt a mentés során: {e}")
 
 
-def check_schedule(gui_widget):
-    """
-    Ellenőrzi az ütemezést és szükség esetén parancsot küld a LED-nek.
-    Args:
-        gui_widget: A GUI2_Widget példánya.
-    """
+
+def check_profiles(gui_widget):
+    """Aktív ütemezési profilok ellenőrzése és LED vezérlése."""
     now_local = datetime.now(LOCAL_TZ)
     today_name_hu = DAYS_HU.get(now_local.strftime('%A'), now_local.strftime('%A'))
 
-    if today_name_hu not in gui_widget.schedule_widgets:
-        return
-
-    day_data_widgets = gui_widget.schedule_widgets[today_name_hu]
-    main_app = gui_widget.main_app # Rövidítés
+    main_app = gui_widget.main_app
+    desired_hex = None
 
     try:
-        on_time_dt = None
-        off_time_dt = None
+        for name, prof in main_app.profiles.items():
+            if not prof.get("active", False):
+                continue
 
-        # --- Bekapcsolási idő meghatározása ---
-        if day_data_widgets["sunrise"].isChecked():
-            offset_str = day_data_widgets["sunrise_offset"].text()
-            try:
-                offset = int(offset_str if offset_str else 0)
-                if main_app.sunrise: # Ellenőrizzük, hogy van-e érvényes napkelte adat
-                    # Fontos: A main_app.sunrise már a helyi időzónában van
-                    on_time_dt = main_app.sunrise + timedelta(minutes=offset)
-            except (ValueError, TypeError) as e:
-                print(f"Hiba a napkelte offset feldolgozásakor ({today_name_hu}): {e}")
-                pass # Hiba esetén None marad
+            day_data = prof.get("schedule", {}).get(today_name_hu)
+            if not day_data:
+                continue
 
-        else: # Fix időpont használata
-            on_time_str = day_data_widgets["on_time"].currentText()
-            if on_time_str:
+            on_time_dt = None
+            off_time_dt = None
+
+            if day_data.get("sunrise"):
                 try:
-                    time_obj = dt_time.fromisoformat(on_time_str)
-                    naive_dt = datetime.combine(now_local.date(), time_obj)
-                    on_time_dt = LOCAL_TZ.localize(naive_dt)
-                except ValueError as e:
-                    print(f"Hiba a bekapcsolási idő ('{on_time_str}') feldolgozásakor ({today_name_hu}): {e}")
-                    pass # Hiba esetén None marad
+                    offset = int(day_data.get("sunrise_offset", 0))
+                    if main_app.sunrise:
+                        on_time_dt = main_app.sunrise + timedelta(minutes=offset)
+                except (ValueError, TypeError):
+                    pass
+            else:
+                on_str = day_data.get("on_time")
+                if on_str:
+                    try:
+                        time_obj = dt_time.fromisoformat(on_str)
+                        on_time_dt = LOCAL_TZ.localize(datetime.combine(now_local.date(), time_obj))
+                    except ValueError:
+                        pass
 
-        # --- Kikapcsolási idő meghatározása ---
-        if day_data_widgets["sunset"].isChecked():
-             offset_str = day_data_widgets["sunset_offset"].text()
-             try:
-                 offset = int(offset_str if offset_str else 0)
-                 if main_app.sunset: # Ellenőrizzük, hogy van-e érvényes napnyugta adat
-                     # Fontos: A main_app.sunset már a helyi időzónában van
-                     off_time_dt = main_app.sunset + timedelta(minutes=offset)
-             except (ValueError, TypeError) as e:
-                 print(f"Hiba a napnyugta offset feldolgozásakor ({today_name_hu}): {e}")
-                 pass
-        else: # Fix időpont használata
-             off_time_str = day_data_widgets["off_time"].currentText()
-             if off_time_str:
-                 try:
-                     time_obj = dt_time.fromisoformat(off_time_str)
-                     naive_dt = datetime.combine(now_local.date(), time_obj)
-                     off_time_dt = LOCAL_TZ.localize(naive_dt)
-                     # Éjfél átnyúlás kezelése: ha a kikapcsolás korábbi, mint a bekapcsolás,
-                     # akkor a kikapcsolás másnapra vonatkozik
-                     if on_time_dt and off_time_dt <= on_time_dt:
-                         print(f"SCHEDULE: Éjfél átnyúlás észlelve ({today_name_hu}), kikapcsolás másnapra tolva.")
-                         off_time_dt += timedelta(days=1)
-                 except ValueError as e:
-                     print(f"Hiba a kikapcsolási idő ('{off_time_str}') feldolgozásakor ({today_name_hu}): {e}")
-                     pass
+            if day_data.get("sunset"):
+                try:
+                    offset = int(day_data.get("sunset_offset", 0))
+                    if main_app.sunset:
+                        off_time_dt = main_app.sunset + timedelta(minutes=offset)
+                except (ValueError, TypeError):
+                    pass
+            else:
+                off_str = day_data.get("off_time")
+                if off_str:
+                    try:
+                        time_obj = dt_time.fromisoformat(off_str)
+                        off_time_dt = LOCAL_TZ.localize(datetime.combine(now_local.date(), time_obj))
+                        if on_time_dt and off_time_dt <= on_time_dt:
+                            off_time_dt += timedelta(days=1)
+                    except ValueError:
+                        pass
 
-        # --- Művelet végrehajtása ---
-        if on_time_dt and off_time_dt:
-            target_color_name = day_data_widgets["color"].currentText()
-            target_color_hex = next((c[2] for c in COLORS if c[0] == target_color_name), None)
+            if on_time_dt and off_time_dt:
+                target_color_name = day_data.get("color", "")
+                target_color_hex = next((c[2] for c in COLORS if c[0] == target_color_name), None)
+                if not target_color_hex:
+                    continue
+                if on_time_dt <= now_local < off_time_dt:
+                    desired_hex = target_color_hex
+                    break
 
-            if not target_color_hex:
-                print(f"SCHEDULE: Nincs érvényes HEX kód a '{target_color_name}' színhez ({today_name_hu}).")
-                return # Ha nincs szín, ne csináljunk semmit
-
-            # Ellenőrzés, hogy az aktuális idő a be/ki intervallumban van-e
-            # Megengedőbb ellenőrzés: now >= on és now < off
-            should_be_on = on_time_dt <= now_local < off_time_dt
-
-            # Debug log
-            # print(f"DEBUG ({today_name_hu}): Now={now_local.strftime('%H:%M:%S')}, On={on_time_dt.strftime('%H:%M:%S')}, Off={off_time_dt.strftime('%H:%M:%S')}, ShouldBeOn={should_be_on}, IsLEDOn={main_app.is_led_on}, LastColor={main_app.last_color_hex}, TargetColor={target_color_hex}")
-
-            # Csak akkor küld parancsot, ha az állapot változna
-            if should_be_on and (not main_app.is_led_on or main_app.last_color_hex != target_color_hex):
-                print(f"SCHEDULE: Bekapcsolás/színváltás ({target_color_name}) - Idő: {now_local.strftime('%H:%M')}")
-                # Közvetlenül hívjuk a controls widget metódusát
+        if desired_hex:
+            if not main_app.is_led_on or main_app.last_color_hex != desired_hex:
                 if gui_widget.controls_widget:
-                    gui_widget.controls_widget.send_color_command(target_color_hex)
-            elif not should_be_on and main_app.is_led_on:
-                print(f"SCHEDULE: Kikapcsolás - Idő: {now_local.strftime('%H:%M')}")
-                # Közvetlenül hívjuk a controls widget metódusát
-                if gui_widget.controls_widget:
-                    gui_widget.controls_widget.turn_off_led()
-
-        # else: # Debug: Ha valamelyik időpont hiányzik
-        #     print(f"DEBUG ({today_name_hu}): Hiányzó időpont(ok): On={on_time_dt}, Off={off_time_dt}")
-
+                    gui_widget.controls_widget.send_color_command(desired_hex)
+        else:
+            if main_app.is_led_on and gui_widget.controls_widget:
+                gui_widget.controls_widget.turn_off_led()
 
     except Exception as e:
-         print(f"Váratlan hiba a schedule ellenőrzésekor ({today_name_hu}): {e}")
-         traceback.print_exc()
+        print(f"Váratlan hiba a profilok ellenőrzésekor: {e}")
+        traceback.print_exc()

@@ -10,6 +10,8 @@ BASE_DIR.mkdir(parents=True, exist_ok=True)
 
 # Az ütemezés fájl teljes elérési útja
 CONFIG_FILE = str(BASE_DIR / "led_schedule.json")
+# Új fájl az ütemezési profilok tárolásához
+PROFILES_FILE = str(BASE_DIR / "led_schedule_profiles.json")
 
 CHARACTERISTIC_UUID = "0000fff3-0000-1000-8000-00805f9b34fb"
 
