@@ -45,7 +45,7 @@ async def attempt_auto_connect(app_instance):
         # Csatlakozási kísérlet indítása az AsyncHelper segítségével
         # Az eredményt a done_callback fogja kezelni és a signalokat kibocsátani
         future = app_instance.async_helper.run_async_task(
-            app_instance.ble.connect(last_addr),
+            app_instance.ble.connect_with_retry(last_addr),
             app_instance.connect_results_signal,
             app_instance.connect_error_signal
         )
