@@ -135,13 +135,21 @@ class GUI2_Widget(QWidget):
         main_layout.addStretch(1) # Rugalmas térköz a vezérlők és az ütemező között
 
         # --- Profilválasztó ---
+        logic.load_profiles_from_file(self.main_app)
+        if not hasattr(self.main_app, "profiles") or not self.main_app.profiles:
+            self.main_app.profiles = {"Alap": {"active": True, "schedule": logic.get_default_schedule()}}
+        self.current_profile_name = list(self.main_app.profiles.keys())[0]
+        self.main_app.schedule = self.main_app.profiles[self.current_profile_name]["schedule"]
+
         profile_layout = QHBoxLayout()
         profile_label = QLabel("Profil:")
         self.profile_combo = QComboBox()
         self.profile_combo.addItems(self.main_app.profiles.keys())
         self.profile_combo.currentTextChanged.connect(self.change_profile)
         self.profile_active_checkbox = QCheckBox("Aktív")
-        self.profile_active_checkbox.setChecked(self.main_app.profiles[self.current_profile_name].get("active", True))
+        self.profile_active_checkbox.setChecked(
+            self.main_app.profiles[self.current_profile_name].get("active", True)
+        )
         self.profile_active_checkbox.stateChanged.connect(self.toggle_profile_active)
         add_profile_btn = QPushButton("Új profil")
         add_profile_btn.clicked.connect(self.add_profile)
@@ -163,11 +171,6 @@ class GUI2_Widget(QWidget):
         for i, header in enumerate(headers): label = QLabel(header); label.setFont(QFont("Arial", 10, QFont.Weight.Bold)); align = Qt.AlignmentFlag.AlignLeft if i == 0 else Qt.AlignmentFlag.AlignCenter; table_layout.addWidget(label, 0, i, align)
         self.schedule_widgets = {}
         self.time_comboboxes = []
-        logic.load_profiles_from_file(self.main_app)
-        if not hasattr(self.main_app, 'profiles') or not self.main_app.profiles:
-            self.main_app.profiles = {"Alap": {"active": True, "schedule": logic.get_default_schedule()}}
-        self.current_profile_name = list(self.main_app.profiles.keys())[0]
-        self.main_app.schedule = self.main_app.profiles[self.current_profile_name]["schedule"]
         color_display_names = ["Nincs kiválasztva"] + [c[0] for c in COLORS]
         valid_color_names = [c[0] for c in COLORS]
         for i, day_hu in enumerate(DAYS):
