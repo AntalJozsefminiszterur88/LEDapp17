@@ -10,13 +10,15 @@ import threading # Szükséges az Event-hez
 CHARACTERISTIC_UUID = "0000fff3-0000-1000-8000-00805f9b34fb"
 KEEP_ALIVE_COMMAND = "7e00000000000000ef"
 LOG_FILE = "led_connection_log.txt"
-CONNECT_TIMEOUT = 15.0
+CONNECT_TIMEOUT = 10.0  # gyorsabb timeout a connect hívásokhoz
 PING_INTERVAL = 20.0
 INACTIVITY_PING_THRESHOLD = 5.0
 RECONNECT_DELAY = 1.0
 MAX_CONNECT_ATTEMPTS = 3
 RESCAN_DELAY = 5.0
 LOOP_SLEEP = 0.5
+FAST_FIND_TIMEOUT = 3.0  # gyors cím alapú keresés ideje
+RESCAN_TIMEOUT = 8.0    # rövidebb újrakeresési idő
 # POST_RESCAN_CONNECT_DELAY itt nincs
 
 def log_event(message):
@@ -29,7 +31,7 @@ async def rescan_and_find_device(target_name):
     """Új keresést végez és megkeresi az eszközt név alapján, címet ad vissza."""
     log_event(f"Új keresés indítása a(z) '{target_name}' nevű eszközhöz...")
     try:
-        devices = await BleakScanner.discover(timeout=15.0)
+        devices = await BleakScanner.discover(timeout=RESCAN_TIMEOUT)
         for device in devices:
             if device.name == target_name:
                 log_event(f"Eszköz újra megtalálva: {device.name} ({device.address})")
@@ -41,6 +43,23 @@ async def rescan_and_find_device(target_name):
         return None
     except Exception as e:
         log_event(f"Hiba az újrakeresés során: {e}")
+        return None
+
+async def quick_find_by_address(address):
+    """Rövid keresés egy adott címre, ha a kötés megszakadt."""
+    log_event(f"Gyors címkeresés: {address}...")
+    try:
+        dev = await BleakScanner.find_device_by_address(address, timeout=FAST_FIND_TIMEOUT)
+        if dev:
+            log_event("Eszköz megtalálva gyors kereséssel.")
+            return address
+        log_event("Gyors keresés nem talált eszközt.")
+        return None
+    except asyncio.CancelledError:
+        log_event("Gyors címkeresés megszakadt (CancelledError).")
+        return None
+    except Exception as e:
+        log_event(f"Hiba a gyors címkeresés során: {e}")
         return None
 
 # *** Függvény szignatúra bővítése a stop_eventtel ***
@@ -132,6 +151,16 @@ async def start_ble_connection_loop(app, stop_event: threading.Event):
                          try: await client_that_failed.disconnect()
                          except Exception as disconn_err_on_fail: log_event(f"Figyelmeztetés: Hiba a kliens bontásakor hiba után: {disconn_err_on_fail}")
 
+                    # gyors címellenőrzés, hátha a hirdetés már elérhető
+                    try:
+                        found = await quick_find_by_address(current_address)
+                        if found:
+                            connection_attempts = 0
+                            await asyncio.sleep(RECONNECT_DELAY)
+                            continue
+                    except Exception as quick_err:
+                        log_event(f"Gyors címellenőrzés hiba: {quick_err}")
+
                     connection_attempts += 1
                     # *** STOP EVENT ELLENŐRZÉSE HIBA ESETÉN IS ***
                     if stop_event.is_set():
@@ -147,6 +176,15 @@ async def start_ble_connection_loop(app, stop_event: threading.Event):
                     if hasattr(app, 'connection_status_signal'): app.connection_status_signal.emit("disconnected")
                     app.connection_status = "disconnected"
                     if app.ble: app.ble.client = None
+                    try:
+                        found = await quick_find_by_address(current_address)
+                        if found:
+                            connection_attempts = 0
+                            await asyncio.sleep(RECONNECT_DELAY)
+                            continue
+                    except Exception as quick_err:
+                        log_event(f"Gyors címellenőrzés hiba: {quick_err}")
+
                     connection_attempts += 1
                     # *** STOP EVENT ELLENŐRZÉSE HIBA ESETÉN IS ***
                     if stop_event.is_set():
