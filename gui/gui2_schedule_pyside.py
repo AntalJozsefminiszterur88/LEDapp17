@@ -11,7 +11,7 @@ import sys # sys import
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGridLayout,
     QComboBox, QLineEdit, QCheckBox, QFrame, QSpacerItem, QSizePolicy,
-    QMessageBox # QGroupBox eltávolítva
+    QMessageBox, QInputDialog # QGroupBox eltávolítva
 )
 from PySide6.QtCore import Qt, QTimer, Slot, QTime
 from PySide6.QtGui import QFont, QColor
@@ -25,7 +25,7 @@ except ImportError:
 
 # --- Modul Importok ---
 try:
-    from config import COLORS, DAYS, CONFIG_FILE
+    from config import COLORS, DAYS, CONFIG_FILE, PROFILES_FILE
     import core.config_manager as config_manager
     import core.registry_utils as registry_utils
     from core.sun_logic import get_local_sun_info, get_hungarian_day_name, DAYS_HU
@@ -59,11 +59,11 @@ except ImportError as e:
         class DummyLogic:
             LOCAL_TZ = pytz.utc
             @staticmethod
-            def load_schedule_from_file(app): pass
+            def load_profiles_from_file(app): pass
             @staticmethod
-            def save_schedule(widget): pass
+            def save_profile(widget): pass
             @staticmethod
-            def check_schedule(widget): pass
+            def check_profiles(widget): pass
             @staticmethod
             def get_local_sun_info(): return {"latitude": 0, "longitude": 0, "sunrise": None, "sunset": None, "located": False}
         logic = DummyLogic()
@@ -134,6 +134,32 @@ class GUI2_Widget(QWidget):
         # main_layout.addSpacing(70) # Korábbi nagy térköz visszaállítása
         main_layout.addStretch(1) # Rugalmas térköz a vezérlők és az ütemező között
 
+        # --- Profilválasztó ---
+        logic.load_profiles_from_file(self.main_app)
+        if not hasattr(self.main_app, "profiles") or not self.main_app.profiles:
+            self.main_app.profiles = {"Alap": {"active": True, "schedule": logic.get_default_schedule()}}
+        self.current_profile_name = list(self.main_app.profiles.keys())[0]
+        self.main_app.current_profile_name = self.current_profile_name
+        self.main_app.schedule = self.main_app.profiles[self.current_profile_name]["schedule"]
+
+        profile_layout = QHBoxLayout()
+        profile_label = QLabel("Profil:")
+        self.profile_combo = QComboBox()
+        self.profile_combo.addItems(self.main_app.profiles.keys())
+        self.profile_combo.currentTextChanged.connect(self.change_profile)
+        self.profile_active_checkbox = QCheckBox("Aktív")
+        self.profile_active_checkbox.setChecked(
+            self.main_app.profiles[self.current_profile_name].get("active", True)
+        )
+        self.profile_active_checkbox.stateChanged.connect(self.toggle_profile_active)
+        add_profile_btn = QPushButton("Új profil")
+        add_profile_btn.clicked.connect(self.add_profile)
+        profile_layout.addWidget(profile_label)
+        profile_layout.addWidget(self.profile_combo)
+        profile_layout.addWidget(self.profile_active_checkbox)
+        profile_layout.addStretch(1)
+        profile_layout.addWidget(add_profile_btn)
+        main_layout.addLayout(profile_layout)
 
         # --- Ütemező Táblázat (GroupBox nélkül) ---
         table_container = QWidget()
@@ -144,7 +170,10 @@ class GUI2_Widget(QWidget):
         table_layout.setColumnStretch(1, 1); table_layout.setColumnStretch(2, 0); table_layout.setColumnStretch(3, 0); table_layout.setColumnStretch(5, 0); table_layout.setColumnStretch(7, 0)
         headers = ["Nap", "Szín", "Fel", "Le", "Napkelte", "+/-", "Napnyugta", "+/-"]
         for i, header in enumerate(headers): label = QLabel(header); label.setFont(QFont("Arial", 10, QFont.Weight.Bold)); align = Qt.AlignmentFlag.AlignLeft if i == 0 else Qt.AlignmentFlag.AlignCenter; table_layout.addWidget(label, 0, i, align)
-        self.schedule_widgets = {}; self.time_comboboxes = []; logic.load_schedule_from_file(self.main_app); color_display_names = ["Nincs kiválasztva"] + [c[0] for c in COLORS]; valid_color_names = [c[0] for c in COLORS]
+        self.schedule_widgets = {}
+        self.time_comboboxes = []
+        color_display_names = ["Nincs kiválasztva"] + [c[0] for c in COLORS]
+        valid_color_names = [c[0] for c in COLORS]
         for i, day_hu in enumerate(DAYS):
             row = i + 1; day_widgets = {}; schedule_data = self.main_app.schedule.get(day_hu, {})
             day_label = QLabel(day_hu, font=QFont("Arial", 10)); table_layout.addWidget(day_label, row, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
@@ -190,7 +219,7 @@ class GUI2_Widget(QWidget):
 
         reset_button = QPushButton("Alaphelyzet"); reset_button.clicked.connect(self.reset_schedule_gui)
         schedule_action_layout.addWidget(reset_button) # Gombok jobb oldalon
-        save_button = QPushButton("Mentés"); save_button.clicked.connect(lambda: logic.save_schedule(self))
+        save_button = QPushButton("Mentés"); save_button.clicked.connect(lambda: logic.save_profile(self))
         schedule_action_layout.addWidget(save_button)
 
         main_layout.addLayout(schedule_action_layout) # Hozzáadás a fő layout-hoz
@@ -211,8 +240,8 @@ class GUI2_Widget(QWidget):
         # --- Időzítők ---
         self.update_time_timer = QTimer(self); self.check_schedule_timer = QTimer(self)
         self.update_time_timer.timeout.connect(self.update_time); self.update_time_timer.start(1000)
-        self.check_schedule_timer.timeout.connect(lambda: logic.check_schedule(self)); self.check_schedule_timer.start(30000)
-        self.update_time(); QTimer.singleShot(500, lambda: logic.check_schedule(self))
+        self.check_schedule_timer.timeout.connect(lambda: logic.check_profiles(self)); self.check_schedule_timer.start(30000)
+        self.update_time(); QTimer.singleShot(500, lambda: logic.check_profiles(self))
 
     # --- Slot Metódusok (változatlanok) ---
     def stop_timers(self):
@@ -221,6 +250,52 @@ class GUI2_Widget(QWidget):
         if hasattr(self, 'update_time_timer'): self.update_time_timer.stop()
         if hasattr(self, 'check_schedule_timer'): self.check_schedule_timer.stop()
         log_event("GUI2 Timers stopped.")
+
+    @Slot(str)
+    def change_profile(self, name: str):
+        """Profil váltása a lenyitható menüből."""
+        if not name or name not in self.main_app.profiles:
+            return
+        logic.save_profile(self)
+        self.current_profile_name = name
+        self.main_app.current_profile_name = name
+        self.main_app.schedule = self.main_app.profiles[name]["schedule"]
+        for day, widgets in self.schedule_widgets.items():
+            data = self.main_app.schedule.get(day, {})
+            widgets["color"].setCurrentText(data.get("color", ""))
+            widgets["on_time"].setCurrentText(data.get("on_time", ""))
+            widgets["off_time"].setCurrentText(data.get("off_time", ""))
+            widgets["sunrise"].setChecked(data.get("sunrise", False))
+            widgets["sunrise_offset"].setText(str(data.get("sunrise_offset", 0)))
+            widgets["sunset"].setChecked(data.get("sunset", False))
+            widgets["sunset_offset"].setText(str(data.get("sunset_offset", 0)))
+            self.toggle_sun_time(widgets["sunrise"].checkState(), list(DAYS).index(day)*2, day, "sunrise")
+            self.toggle_sun_time(widgets["sunset"].checkState(), list(DAYS).index(day)*2+1, day, "sunset")
+        self.profile_active_checkbox.blockSignals(True)
+        self.profile_active_checkbox.setChecked(self.main_app.profiles[name].get("active", True))
+        self.profile_active_checkbox.blockSignals(False)
+
+    @Slot()
+    def add_profile(self):
+        """Új profil létrehozása."""
+        name, ok = QInputDialog.getText(self, "Új profil", "Profil neve:")
+        if not ok or not name:
+            return
+        if name in self.main_app.profiles:
+            QMessageBox.warning(self, "Hiba", "Már létezik ilyen profil.")
+            return
+        self.main_app.profiles[name] = {"active": False, "schedule": logic.get_default_schedule()}
+        self.profile_combo.addItem(name)
+        self.profile_combo.setCurrentText(name)
+        self.main_app.current_profile_name = name
+        logic._save_profiles_to_file(self.main_app)
+
+    @Slot(int)
+    def toggle_profile_active(self, state):
+        """Aktív jelölő változása."""
+        active = state == Qt.CheckState.Checked.value
+        self.main_app.profiles[self.current_profile_name]["active"] = active
+        logic._save_profiles_to_file(self.main_app)
 
     @Slot()
     def reset_schedule_gui(self):

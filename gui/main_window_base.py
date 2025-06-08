@@ -105,9 +105,12 @@ class LEDApp_BaseWindow(QMainWindow):
         self.sunset = None
         self.connection_status = "disconnected"
         self._current_gui_widget = None # Ezt a GuiManager is látja/módosítja
-        self.schedule = {day: {"color": "", "on_time": "", "off_time": "",
-                               "sunrise": False, "sunrise_offset": 0,
-                               "sunset": False, "sunset_offset": 0} for day in DAYS}
+        default_schedule = {day: {"color": "", "on_time": "", "off_time": "",
+                                 "sunrise": False, "sunrise_offset": 0,
+                                 "sunset": False, "sunset_offset": 0} for day in DAYS}
+        self.profiles = {"Alap": {"active": True, "schedule": default_schedule}}
+        self.current_profile_name = "Alap"
+        self.schedule = default_schedule
         self.ble = BLEController()
         self._is_auto_starting = False # Új flag az automatikus indulás jelzésére
         self._initial_connection_attempted = False # Új flag
