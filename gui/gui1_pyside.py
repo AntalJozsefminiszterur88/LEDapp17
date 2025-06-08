@@ -148,7 +148,7 @@ class GUI1_Widget(QWidget):
         self.update_button_states()
 
         self.main_app.async_helper.run_async_task(
-            self.main_app.ble.connect(address),
+            self.main_app.ble.connect_with_retry(address),
             self.main_app.connect_results_signal,
             self.main_app.connect_error_signal
         )

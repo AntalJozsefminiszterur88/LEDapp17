@@ -75,6 +75,35 @@ class BLEController:
                 self.client = None
                 raise e
 
+    async def connect_with_retry(self, address, attempts=3, delay=1.0, timeout=15.0):
+        """Try connecting multiple times before giving up."""
+        last_exc = None
+        for attempt in range(1, attempts + 1):
+            try:
+                log_event(f"BLEController: Connection attempt {attempt}/{attempts} to {address}")
+                # reuse the single attempt connect with specified timeout
+                async with self._connection_lock:
+                    if self.client and self.client.is_connected:
+                        if self.client.address.upper() == address.upper():
+                            log_event(f"BLEController: Already connected: {address}")
+                            return True
+                        else:
+                            await self.disconnect()
+
+                    self.client = BleakClient(address)
+                    await self.client.connect(timeout=timeout)
+                    log_event(f"BLEController: Connected on attempt {attempt}: {address}")
+                    return True
+            except Exception as e:
+                last_exc = e
+                log_event(f"BLEController: Connect error on attempt {attempt} ({type(e).__name__}): {e}")
+                self.client = None
+                if attempt < attempts:
+                    await asyncio.sleep(delay)
+        if last_exc:
+            raise last_exc
+        raise BleakError("Unknown connection failure")
+
     async def disconnect(self):
         """Kapcsolat bontása."""
         async with self._connection_lock:
