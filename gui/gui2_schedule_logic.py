@@ -125,6 +125,111 @@ def _save_profiles_to_file(main_app):
         return False
 
 
+def validate_profile(profile):
+    """Ellenőrzi, hogy a profil ütemezése érvényes-e.
+
+    Csak az on/off időket vizsgáljuk meg, ha nincs napkelte/napnyugta
+    használatban. Hibás formátum vagy hiányzó pár esetén False-t adunk vissza.
+    """
+
+    for day in DAYS:
+        data = profile.get("schedule", {}).get(day, {})
+        if not data or data.get("sunrise") or data.get("sunset"):
+            continue
+        on = data.get("on_time")
+        off = data.get("off_time")
+        if bool(on) != bool(off):
+            return False
+        if on and off:
+            try:
+                dt_time.fromisoformat(on)
+                dt_time.fromisoformat(off)
+            except ValueError:
+                return False
+    return True
+
+
+def check_profile_conflicts(main_app, target_name):
+    """Egyszerű ütközésvizsgálat az aktivált profilok között.
+
+    Csak az explicit on/off időket hasonlítjuk össze. A napkelte/napnyugta
+    alapú beállításokat nem ellenőrizzük, mert azok pontos ideje helyfüggő.
+
+    Args:
+        main_app: Az alkalmazás fő objektuma, amely tartalmazza a profilokat.
+        target_name: A vizsgálandó profil neve.
+
+    Returns:
+        List[str]: Napok és profilnevek, amelyek ütköznek a célprofillal.
+    """
+
+    target = main_app.profiles.get(target_name)
+    if not target:
+        return []
+
+    def extract_intervals(profile):
+        """Visszaadja a profil összes napi intervallumát.
+
+        Az éjfélt átlépő időszakokat kettébontjuk, és a második részt a
+        következő naphoz rendeljük hozzá, így a napok közötti ütközések is
+        detektálhatók.
+        """
+
+        result = {day: [] for day in DAYS}
+        for idx, day in enumerate(DAYS):
+            data = profile.get("schedule", {}).get(day, {})
+            if not data or data.get("sunrise") or data.get("sunset"):
+                continue
+            on = data.get("on_time")
+            off = data.get("off_time")
+            if not on or not off:
+                continue
+            try:
+                on_t = dt_time.fromisoformat(on)
+                off_t = dt_time.fromisoformat(off)
+            except ValueError:
+                continue
+
+            start = on_t.hour * 60 + on_t.minute
+            end = off_t.hour * 60 + off_t.minute
+
+            # Ha a kikapcsolási idő korábban van, mint a bekapcsolási,
+            # akkor az időszak éjfélt átlép. Azonban a pontos éjfél (00:00)
+            # nem jelent átlépést, ezért csak akkor bontjuk ketté az
+            # intervallumot, ha az off_time valóban kisebb, nem pedig
+            # egyenlő a kezdettel.
+            if end > start:
+                result[day].append((start, end))
+            else:
+                # éjfél után ér véget -> kettéosztjuk
+                result[day].append((start, 24 * 60))
+                next_day = DAYS[(idx + 1) % len(DAYS)]
+                result[next_day].append((0, end))
+        return result
+
+    target_intervals = extract_intervals(target)
+    conflicts = []
+
+    for other_name, other in main_app.profiles.items():
+        if other_name == target_name or not other.get("active", False):
+            continue
+        other_intervals = extract_intervals(other)
+        for day in DAYS:
+            ints1 = target_intervals.get(day, [])
+            ints2 = other_intervals.get(day, [])
+            if not ints1 or not ints2:
+                continue
+            for s1, e1 in ints1:
+                for s2, e2 in ints2:
+                    if s1 < e2 and s2 < e1:
+                        conflicts.append(f"{day} - {other_name}")
+                        break
+                else:
+                    continue
+                break
+    return conflicts
+
+
 def save_profile(gui_widget):
     """
     Elmenti az aktuális ütemezési beállításokat JSON fájlba a GUI widgetek alapján.
@@ -193,6 +298,7 @@ def save_profile(gui_widget):
         if _save_profiles_to_file(gui_widget.main_app):
             QMessageBox.information(gui_widget, "Mentés sikeres", "Az ütemezés sikeresen elmentve.")
             gui_widget.main_app.schedule = schedule_to_save
+            gui_widget.unsaved_changes = False
         else:
             QMessageBox.critical(gui_widget, "Mentési hiba", "Nem sikerült a profilok mentése.")
     except Exception as e:
