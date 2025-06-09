@@ -142,25 +142,52 @@ class GUI2_Widget(QWidget):
 
         self.current_profile_name = list(self.main_app.profiles.keys())[0]
         self.main_app.schedule = self.main_app.profiles[self.current_profile_name]["schedule"]
+        self.unsaved_changes = False
+
+        def load_profile_into_gui(name):
+            """Frissíti a widgeteket a megadott profil adataival."""
+            self.main_app.schedule = self.main_app.profiles[name]["schedule"]
+            for day, widgets in self.schedule_widgets.items():
+                data = self.main_app.schedule.get(day, {})
+                widgets["color"].setCurrentText(data.get("color", ""))
+                widgets["on_time"].setCurrentText(data.get("on_time", ""))
+                widgets["off_time"].setCurrentText(data.get("off_time", ""))
+                widgets["sunrise"].setChecked(data.get("sunrise", False))
+                widgets["sunrise_offset"].setText(str(data.get("sunrise_offset", 0)))
+                widgets["sunset"].setChecked(data.get("sunset", False))
+                widgets["sunset_offset"].setText(str(data.get("sunset_offset", 0)))
+                self.toggle_sun_time(widgets["sunrise"].checkState(), list(DAYS).index(day)*2, day, "sunrise")
+                self.toggle_sun_time(widgets["sunset"].checkState(), list(DAYS).index(day)*2+1, day, "sunset")
+            self.profile_active_checkbox.blockSignals(True)
+            self.profile_active_checkbox.setChecked(self.main_app.profiles[name].get("active", True))
+            self.profile_active_checkbox.blockSignals(False)
+
+        self._load_profile_into_gui = load_profile_into_gui
 
         # --- Profilválasztó ---
+        profile_container = QVBoxLayout()
         profile_layout = QHBoxLayout()
         profile_label = QLabel("Profil:")
         self.profile_combo = QComboBox()
-        self.profile_combo.addItems(self.main_app.profiles.keys())
+        self.profile_combo.addItems(list(self.main_app.profiles.keys()))
         self.profile_combo.setCurrentText(self.current_profile_name)
         self.profile_combo.currentTextChanged.connect(self.change_profile)
         self.profile_active_checkbox = QCheckBox("Aktív")
-        self.profile_active_checkbox.setChecked(self.main_app.profiles[self.current_profile_name].get("active", True))
+        self.profile_active_checkbox.setChecked(
+            self.main_app.profiles[self.current_profile_name].get("active", True)
+        )
         self.profile_active_checkbox.stateChanged.connect(self.toggle_profile_active)
-        add_profile_btn = QPushButton("Új profil")
-        add_profile_btn.clicked.connect(self.add_profile)
         profile_layout.addWidget(profile_label)
         profile_layout.addWidget(self.profile_combo)
         profile_layout.addWidget(self.profile_active_checkbox)
         profile_layout.addStretch(1)
-        profile_layout.addWidget(add_profile_btn)
-        main_layout.addLayout(profile_layout)
+        profile_container.addLayout(profile_layout)
+
+        add_profile_btn = QPushButton("Új profil")
+        add_profile_btn.setFixedWidth(56)
+        add_profile_btn.clicked.connect(self.add_profile)
+        profile_container.addWidget(add_profile_btn, 0, Qt.AlignmentFlag.AlignLeft)
+        main_layout.addLayout(profile_container)
 
         # --- Ütemező Táblázat (GroupBox nélkül) ---
         table_container = QWidget()
@@ -176,22 +203,29 @@ class GUI2_Widget(QWidget):
         color_display_names = ["Nincs kiválasztva"] + [c[0] for c in COLORS]
         valid_color_names = [c[0] for c in COLORS]
         for i, day_hu in enumerate(DAYS):
-            row = i + 1; day_widgets = {}; schedule_data = self.main_app.schedule.get(day_hu, {})
+            row = i + 1
+            day_widgets = {}
+            schedule_data = self.main_app.schedule.get(day_hu, {})
             day_label = QLabel(day_hu, font=QFont("Arial", 10)); table_layout.addWidget(day_label, row, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
             color_cb = QComboBox(); color_cb.addItems(color_display_names); saved_color = schedule_data.get("color", ""); color_cb.setCurrentIndex(color_display_names.index(saved_color) if saved_color in valid_color_names else 0)
+            color_cb.currentTextChanged.connect(self.mark_unsaved)
             table_layout.addWidget(color_cb, row, 1); day_widgets["color"] = color_cb
             time_values = [""] + [f"{h:02d}:{m:02d}" for h in range(24) for m in range(0, 60, 5)]
             on_time_cb = QComboBox(); on_time_cb.addItems(time_values); on_time_cb.setCurrentText(schedule_data.get("on_time", "")); on_time_cb.setEditable(True); on_time_cb.setFixedWidth(70)
+            on_time_cb.currentTextChanged.connect(self.mark_unsaved)
             table_layout.addWidget(on_time_cb, row, 2, Qt.AlignmentFlag.AlignCenter); day_widgets["on_time"] = on_time_cb; self.time_comboboxes.append(on_time_cb)
             off_time_cb = QComboBox(); off_time_cb.addItems(time_values); off_time_cb.setCurrentText(schedule_data.get("off_time", "")); off_time_cb.setEditable(True); off_time_cb.setFixedWidth(70)
+            off_time_cb.currentTextChanged.connect(self.mark_unsaved)
             table_layout.addWidget(off_time_cb, row, 3, Qt.AlignmentFlag.AlignCenter); day_widgets["off_time"] = off_time_cb; self.time_comboboxes.append(off_time_cb)
             sunrise_cb = QCheckBox(); sunrise_cb.setChecked(schedule_data.get("sunrise", False)); table_layout.addWidget(sunrise_cb, row, 4, Qt.AlignmentFlag.AlignCenter)
-            day_widgets["sunrise"] = sunrise_cb; sunrise_cb.stateChanged.connect(lambda state, idx=i*2, d=day_hu: self.toggle_sun_time(state, idx, d, "sunrise"))
+            day_widgets["sunrise"] = sunrise_cb; sunrise_cb.stateChanged.connect(lambda state, idx=i*2, d=day_hu: (self.mark_unsaved(), self.toggle_sun_time(state, idx, d, "sunrise")))
             sunrise_offset_entry = QLineEdit(str(schedule_data.get("sunrise_offset", 0))); sunrise_offset_entry.setFixedWidth(40); sunrise_offset_entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            sunrise_offset_entry.textChanged.connect(self.mark_unsaved)
             table_layout.addWidget(sunrise_offset_entry, row, 5, Qt.AlignmentFlag.AlignCenter); day_widgets["sunrise_offset"] = sunrise_offset_entry
             sunset_cb = QCheckBox(); sunset_cb.setChecked(schedule_data.get("sunset", False)); table_layout.addWidget(sunset_cb, row, 6, Qt.AlignmentFlag.AlignCenter)
-            day_widgets["sunset"] = sunset_cb; sunset_cb.stateChanged.connect(lambda state, idx=i*2+1, d=day_hu: self.toggle_sun_time(state, idx, d, "sunset"))
+            day_widgets["sunset"] = sunset_cb; sunset_cb.stateChanged.connect(lambda state, idx=i*2+1, d=day_hu: (self.mark_unsaved(), self.toggle_sun_time(state, idx, d, "sunset")))
             sunset_offset_entry = QLineEdit(str(schedule_data.get("sunset_offset", 0))); sunset_offset_entry.setFixedWidth(40); sunset_offset_entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            sunset_offset_entry.textChanged.connect(self.mark_unsaved)
             table_layout.addWidget(sunset_offset_entry, row, 7, Qt.AlignmentFlag.AlignCenter); day_widgets["sunset_offset"] = sunset_offset_entry
             self.schedule_widgets[day_hu] = day_widgets; self.toggle_sun_time(sunrise_cb.checkState(), i*2, day_hu, "sunrise"); self.toggle_sun_time(sunset_cb.checkState(), i*2+1, day_hu, "sunset")
         # --- Ütemező Táblázat Vége ---
@@ -252,28 +286,51 @@ class GUI2_Widget(QWidget):
         if hasattr(self, 'check_schedule_timer'): self.check_schedule_timer.stop()
         log_event("GUI2 Timers stopped.")
 
+    @Slot()
+    def mark_unsaved(self):
+        """Jelzi, hogy módosítás történt a jelenlegi profilon."""
+        self.unsaved_changes = True
+
     @Slot(str)
     def change_profile(self, name: str):
         """Profil váltása a lenyitható menüből."""
         if not name or name not in self.main_app.profiles:
             return
-        logic.save_profile(self)
+        if name == self.current_profile_name:
+            return
+        if self.unsaved_changes:
+            msg = QMessageBox(self)
+            msg.setWindowTitle("Mentés")
+            msg.setText(
+                "A módosítások nincsenek elmentve. Szeretnéd elmenteni a profil váltás előtt?"
+            )
+            yes_btn = msg.addButton("Igen", QMessageBox.AcceptRole)
+            no_btn = msg.addButton("Nem", QMessageBox.NoRole)
+            cancel_btn = msg.addButton("Mégsem", QMessageBox.RejectRole)
+            for btn in (yes_btn, no_btn, cancel_btn):
+                btn.setFixedWidth(int(btn.sizeHint().width() * 0.5))
+            msg.setDefaultButton(cancel_btn)
+            msg.exec()
+            clicked = msg.clickedButton()
+            if clicked == yes_btn:
+                logic.save_profile(self)
+                if self.unsaved_changes:
+                    # Mentés sikertelen, visszaállunk az előző profilra
+                    self.profile_combo.blockSignals(True)
+                    self.profile_combo.setCurrentText(self.current_profile_name)
+                    self.profile_combo.blockSignals(False)
+                    return
+            elif clicked == no_btn:
+                # Felhasználó elvetette a módosításokat
+                self.unsaved_changes = False
+            elif clicked == cancel_btn:
+                self.profile_combo.blockSignals(True)
+                self.profile_combo.setCurrentText(self.current_profile_name)
+                self.profile_combo.blockSignals(False)
+                return
         self.current_profile_name = name
-        self.main_app.schedule = self.main_app.profiles[name]["schedule"]
-        for day, widgets in self.schedule_widgets.items():
-            data = self.main_app.schedule.get(day, {})
-            widgets["color"].setCurrentText(data.get("color", ""))
-            widgets["on_time"].setCurrentText(data.get("on_time", ""))
-            widgets["off_time"].setCurrentText(data.get("off_time", ""))
-            widgets["sunrise"].setChecked(data.get("sunrise", False))
-            widgets["sunrise_offset"].setText(str(data.get("sunrise_offset", 0)))
-            widgets["sunset"].setChecked(data.get("sunset", False))
-            widgets["sunset_offset"].setText(str(data.get("sunset_offset", 0)))
-            self.toggle_sun_time(widgets["sunrise"].checkState(), list(DAYS).index(day)*2, day, "sunrise")
-            self.toggle_sun_time(widgets["sunset"].checkState(), list(DAYS).index(day)*2+1, day, "sunset")
-        self.profile_active_checkbox.blockSignals(True)
-        self.profile_active_checkbox.setChecked(self.main_app.profiles[name].get("active", True))
-        self.profile_active_checkbox.blockSignals(False)
+        self.unsaved_changes = False
+        self._load_profile_into_gui(name)
 
     @Slot()
     def add_profile(self):
@@ -292,9 +349,46 @@ class GUI2_Widget(QWidget):
     @Slot(int)
     def toggle_profile_active(self, state):
         """Aktív jelölő változása."""
-        active = state == Qt.CheckState.Checked.value
-        self.main_app.profiles[self.current_profile_name]["active"] = active
-        logic._save_profiles_to_file(self.main_app)
+        prof = self.main_app.profiles[self.current_profile_name]
+        old_active = prof.get("active", False)
+        desired_active = state == Qt.CheckState.Checked.value
+
+        if desired_active:
+            if not logic.validate_profile(prof):
+                QMessageBox.warning(
+                    self,
+                    "Hiba",
+                    "Érvénytelen időpontok az aktuális profilban. Javítsd a beállításokat.",
+                )
+                desired_active = False
+            else:
+                conflicts = logic.check_profile_conflicts(
+                    self.main_app, self.current_profile_name
+                )
+                if conflicts:
+                    QMessageBox.warning(
+                        self,
+                        "Ütközés",
+                        "A(z) {} profil ütközik az alábbiakkal:\n{}".format(
+                            self.current_profile_name, "\n".join(conflicts)
+                        ),
+                    )
+                    desired_active = False
+
+        if desired_active != old_active:
+            prof["active"] = desired_active
+            if not logic._save_profiles_to_file(self.main_app):
+                QMessageBox.critical(self, "Hiba", "Nem sikerült a profilok mentése.")
+                prof["active"] = old_active
+                desired_active = old_active
+            self.profile_active_checkbox.blockSignals(True)
+            self.profile_active_checkbox.setChecked(desired_active)
+            self.profile_active_checkbox.blockSignals(False)
+            return
+
+        self.profile_active_checkbox.blockSignals(True)
+        self.profile_active_checkbox.setChecked(desired_active)
+        self.profile_active_checkbox.blockSignals(False)
 
     @Slot()
     def reset_schedule_gui(self):
@@ -315,6 +409,7 @@ class GUI2_Widget(QWidget):
                 widgets["sunset_offset"].setText("0")
                 self.toggle_sun_time(Qt.CheckState.Unchecked.value, list(DAYS).index(day) * 2, day, "sunrise")
                 self.toggle_sun_time(Qt.CheckState.Unchecked.value, list(DAYS).index(day) * 2 + 1, day, "sunset")
+            self.unsaved_changes = True
 
 
     @Slot(int)
