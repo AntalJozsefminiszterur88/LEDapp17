@@ -248,6 +248,7 @@ def save_profile(gui_widget):
         if _save_profiles_to_file(gui_widget.main_app):
             QMessageBox.information(gui_widget, "Mentés sikeres", "Az ütemezés sikeresen elmentve.")
             gui_widget.main_app.schedule = schedule_to_save
+            gui_widget.unsaved_changes = False
         else:
             QMessageBox.critical(gui_widget, "Mentési hiba", "Nem sikerült a profilok mentése.")
     except Exception as e:
