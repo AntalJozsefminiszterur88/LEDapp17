@@ -42,6 +42,8 @@ def get_default_schedule():
             "color": COLORS[0][0] if COLORS else "",
             "on_time": "",
             "off_time": "",
+            "on_time2": "",
+            "off_time2": "",
             "sunrise": False,
             "sunrise_offset": 0,
             "sunset": False,
@@ -79,6 +81,9 @@ def load_profiles_from_file(main_app):
                                         d[key] = 0
                                 elif isinstance(val, type(d[key])):
                                     d[key] = val
+                        for time_key in ("on_time2", "off_time2"):
+                            if time_key in sched[day]:
+                                d[time_key] = sched[day][time_key]
                     merged[day] = d
                 profiles[name] = {"active": active, "schedule": merged}
 
@@ -107,6 +112,9 @@ def load_profiles_from_file(main_app):
                                     d[key] = 0
                             elif isinstance(val, type(d[key])):
                                 d[key] = val
+                    for time_key in ("on_time2", "off_time2"):
+                        if time_key in loaded[day]:
+                            d[time_key] = loaded[day][time_key]
                 single_schedule[day] = d
         except Exception as e:
             print(f"Hiba a régi ütemezés betöltésekor: {e}")
@@ -123,6 +131,114 @@ def _save_profiles_to_file(main_app):
     except Exception as e:
         print(f"Hiba a profilok mentésekor: {e}")
         return False
+
+
+def validate_profile(profile):
+    """Ellenőrzi, hogy a profil ütemezése érvényes-e.
+
+    Csak az on/off időket vizsgáljuk meg, ha nincs napkelte/napnyugta
+    használatban. Hibás formátum vagy hiányzó pár esetén False-t adunk vissza.
+    """
+
+    for day in DAYS:
+        data = profile.get("schedule", {}).get(day, {})
+        if not data or data.get("sunrise") or data.get("sunset"):
+            continue
+        for key_on, key_off in [("on_time", "off_time"), ("on_time2", "off_time2")]:
+            on = data.get(key_on)
+            off = data.get(key_off)
+            if bool(on) != bool(off):
+                return False
+            if on and off:
+                try:
+                    dt_time.fromisoformat(on)
+                    dt_time.fromisoformat(off)
+                except ValueError:
+                    return False
+    return True
+
+
+def check_profile_conflicts(main_app, target_name):
+    """Egyszerű ütközésvizsgálat az aktivált profilok között.
+
+    Csak az explicit on/off időket hasonlítjuk össze. A napkelte/napnyugta
+    alapú beállításokat nem ellenőrizzük, mert azok pontos ideje helyfüggő.
+
+    Args:
+        main_app: Az alkalmazás fő objektuma, amely tartalmazza a profilokat.
+        target_name: A vizsgálandó profil neve.
+
+    Returns:
+        List[str]: Napok és profilnevek, amelyek ütköznek a célprofillal.
+    """
+
+    target = main_app.profiles.get(target_name)
+    if not target:
+        return []
+
+    def extract_intervals(profile):
+        """Visszaadja a profil összes napi intervallumát.
+
+        Az éjfélt átlépő időszakokat kettébontjuk, és a második részt a
+        következő naphoz rendeljük hozzá, így a napok közötti ütközések is
+        detektálhatók.
+        """
+
+        result = {day: [] for day in DAYS}
+        for idx, day in enumerate(DAYS):
+            data = profile.get("schedule", {}).get(day, {})
+            if not data or data.get("sunrise") or data.get("sunset"):
+                continue
+            pairs = [(data.get("on_time"), data.get("off_time")),
+                     (data.get("on_time2"), data.get("off_time2"))]
+            for on, off in pairs:
+                if not on or not off:
+                    continue
+                try:
+                    on_t = dt_time.fromisoformat(on)
+                    off_t = dt_time.fromisoformat(off)
+                except ValueError:
+                    continue
+
+                start = on_t.hour * 60 + on_t.minute
+                end = off_t.hour * 60 + off_t.minute
+
+                if end > start:
+                    result[day].append((start, end))
+                elif end < start:
+                    result[day].append((start, 24 * 60))
+                    next_day = DAYS[(idx + 1) % len(DAYS)]
+                    result[next_day].append((0, end))
+                else:
+                    continue
+        return result
+
+    target_intervals = extract_intervals(target)
+    conflicts = []
+
+    for other_name, other in main_app.profiles.items():
+        if other_name == target_name or not other.get("active", False):
+            continue
+        other_intervals = extract_intervals(other)
+        for day in DAYS:
+            ints1 = sorted(target_intervals.get(day, []))
+            ints2 = sorted(other_intervals.get(day, []))
+            if not ints1 or not ints2:
+                continue
+            i = j = 0
+            while i < len(ints1) and j < len(ints2):
+                s1, e1 = ints1[i]
+                s2, e2 = ints2[j]
+                if s1 < e2 and s2 < e1:
+                    conflicts.append(f"{day} - {other_name}")
+                    break
+                if e1 <= e2:
+                    i += 1
+                else:
+                    j += 1
+            if conflicts and conflicts[-1].startswith(day):
+                break
+    return conflicts
 
 
 def save_profile(gui_widget):
@@ -151,8 +267,12 @@ def save_profile(gui_widget):
 
             on_time_val = widgets["on_time"].currentText()
             off_time_val = widgets["off_time"].currentText()
+            on_time2_val = widgets.get("on_time2").currentText() if "on_time2" in widgets else ""
+            off_time2_val = widgets.get("off_time2").currentText() if "off_time2" in widgets else ""
             temp_data["on_time"] = ""
             temp_data["off_time"] = ""
+            temp_data["on_time2"] = ""
+            temp_data["off_time2"] = ""
 
             # Validáljuk a HH:MM formátumot, ha nincs napkelte/napnyugta bejelölve
             if not temp_data["sunrise"] and on_time_val:
@@ -168,6 +288,17 @@ def save_profile(gui_widget):
                      temp_data["off_time"] = off_time_val
                  except ValueError:
                      raise ValueError(f"Érvénytelen kikapcsolási idő formátum: '{off_time_val}'. HH:MM formátum szükséges.")
+
+            if on_time2_val or off_time2_val:
+                if not (on_time2_val and off_time2_val):
+                    raise ValueError("A második időszak csak teljes párban adható meg.")
+                try:
+                    dt_time.fromisoformat(on_time2_val)
+                    dt_time.fromisoformat(off_time2_val)
+                    temp_data["on_time2"] = on_time2_val
+                    temp_data["off_time2"] = off_time2_val
+                except ValueError:
+                    raise ValueError("Érvénytelen második időszak formátum. HH:MM szükséges.")
 
             schedule_to_save[day] = temp_data
 
@@ -193,6 +324,7 @@ def save_profile(gui_widget):
         if _save_profiles_to_file(gui_widget.main_app):
             QMessageBox.information(gui_widget, "Mentés sikeres", "Az ütemezés sikeresen elmentve.")
             gui_widget.main_app.schedule = schedule_to_save
+            gui_widget.unsaved_changes = False
         else:
             QMessageBox.critical(gui_widget, "Mentési hiba", "Nem sikerült a profilok mentése.")
     except Exception as e:
@@ -216,6 +348,8 @@ def check_profiles(gui_widget):
             day_data = prof.get("schedule", {}).get(today_name_hu)
             if not day_data:
                 continue
+
+            intervals = []
 
             on_time_dt = None
             off_time_dt = None
@@ -253,15 +387,33 @@ def check_profiles(gui_widget):
                             off_time_dt += timedelta(days=1)
                     except ValueError:
                         pass
-
             if on_time_dt and off_time_dt:
-                target_color_name = day_data.get("color", "")
-                target_color_hex = next((c[2] for c in COLORS if c[0] == target_color_name), None)
-                if not target_color_hex:
-                    continue
-                if on_time_dt <= now_local < off_time_dt:
+                intervals.append((on_time_dt, off_time_dt))
+            # Második időszak
+            on2_str = day_data.get("on_time2")
+            off2_str = day_data.get("off_time2")
+            if on2_str and off2_str:
+                try:
+                    on2_t = dt_time.fromisoformat(on2_str)
+                    off2_t = dt_time.fromisoformat(off2_str)
+                    on2_dt = LOCAL_TZ.localize(datetime.combine(now_local.date(), on2_t))
+                    off2_dt = LOCAL_TZ.localize(datetime.combine(now_local.date(), off2_t))
+                    if off2_dt <= on2_dt:
+                        off2_dt += timedelta(days=1)
+                    intervals.append((on2_dt, off2_dt))
+                except ValueError:
+                    pass
+
+            target_color_name = day_data.get("color", "")
+            target_color_hex = next((c[2] for c in COLORS if c[0] == target_color_name), None)
+            if not target_color_hex:
+                continue
+            for start_dt, end_dt in intervals:
+                if start_dt <= now_local < end_dt:
                     desired_hex = target_color_hex
                     break
+            if desired_hex:
+                break
 
         if desired_hex:
             if not main_app.is_led_on or main_app.last_color_hex != desired_hex:
