@@ -125,6 +125,61 @@ def _save_profiles_to_file(main_app):
         return False
 
 
+def check_profile_conflicts(main_app, target_name):
+    """Egyszerű ütközésvizsgálat az aktivált profilok között.
+
+    Csak az explicit on/off időket hasonlítjuk össze. A napkelte/napnyugta
+    alapú beállításokat nem ellenőrizzük, mert azok pontos ideje helyfüggő.
+
+    Args:
+        main_app: Az alkalmazás fő objektuma, amely tartalmazza a profilokat.
+        target_name: A vizsgálandó profil neve.
+
+    Returns:
+        List[str]: Napok és profilnevek, amelyek ütköznek a célprofillal.
+    """
+
+    target = main_app.profiles.get(target_name)
+    if not target:
+        return []
+
+    def parse_interval(day_data):
+        if not day_data:
+            return None
+        if day_data.get("sunrise") or day_data.get("sunset"):
+            return None
+        on_str = day_data.get("on_time")
+        off_str = day_data.get("off_time")
+        if not on_str or not off_str:
+            return None
+        try:
+            on_t = dt_time.fromisoformat(on_str)
+            off_t = dt_time.fromisoformat(off_str)
+        except ValueError:
+            return None
+        on_m = on_t.hour * 60 + on_t.minute
+        off_m = off_t.hour * 60 + off_t.minute
+        if off_m <= on_m:
+            off_m += 24 * 60
+        return on_m, off_m
+
+    conflicts = []
+    for other_name, other in main_app.profiles.items():
+        if other_name == target_name or not other.get("active", False):
+            continue
+        for day in DAYS:
+            int1 = parse_interval(target.get("schedule", {}).get(day, {}))
+            int2 = parse_interval(other.get("schedule", {}).get(day, {}))
+            if not int1 or not int2:
+                continue
+            s1, e1 = int1
+            s2, e2 = int2
+            if s1 < e2 and s2 < e1:
+                conflicts.append(f"{day} - {other_name}")
+                break
+    return conflicts
+
+
 def save_profile(gui_widget):
     """
     Elmenti az aktuális ütemezési beállításokat JSON fájlba a GUI widgetek alapján.

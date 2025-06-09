@@ -147,7 +147,7 @@ class GUI2_Widget(QWidget):
         profile_layout = QHBoxLayout()
         profile_label = QLabel("Profil:")
         self.profile_combo = QComboBox()
-        self.profile_combo.addItems(self.main_app.profiles.keys())
+        self.profile_combo.addItems(list(self.main_app.profiles.keys()))
         self.profile_combo.setCurrentText(self.current_profile_name)
         self.profile_combo.currentTextChanged.connect(self.change_profile)
         self.profile_active_checkbox = QCheckBox("Aktív")
@@ -294,6 +294,21 @@ class GUI2_Widget(QWidget):
         """Aktív jelölő változása."""
         active = state == Qt.CheckState.Checked.value
         self.main_app.profiles[self.current_profile_name]["active"] = active
+        if active:
+            conflicts = logic.check_profile_conflicts(self.main_app, self.current_profile_name)
+            if conflicts:
+                QMessageBox.warning(
+                    self,
+                    "Ütközés",
+                    "A(z) {} profil ütközik az alábbiakkal:\n{}".format(
+                        self.current_profile_name, "\n".join(conflicts)
+                    ),
+                )
+                self.main_app.profiles[self.current_profile_name]["active"] = False
+                self.profile_active_checkbox.blockSignals(True)
+                self.profile_active_checkbox.setChecked(False)
+                self.profile_active_checkbox.blockSignals(False)
+                return
         logic._save_profiles_to_file(self.main_app)
 
     @Slot()
