@@ -147,7 +147,7 @@ class GUI2_Widget(QWidget):
         profile_layout = QHBoxLayout()
         profile_label = QLabel("Profil:")
         self.profile_combo = QComboBox()
-        self.profile_combo.addItems(self.main_app.profiles.keys())
+        self.profile_combo.addItems(list(self.main_app.profiles.keys()))
         self.profile_combo.setCurrentText(self.current_profile_name)
         self.profile_combo.currentTextChanged.connect(self.change_profile)
         self.profile_active_checkbox = QCheckBox("Aktív")
