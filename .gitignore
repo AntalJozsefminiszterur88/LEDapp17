@@ -1,0 +1,25 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.spec
+
+# IDEs and editors
+.idea/
+.vscode/
+
+# Testing
+.pytest_cache/
+
+# Executables
+LEDApp.exe
+
+# Logs
+*.log

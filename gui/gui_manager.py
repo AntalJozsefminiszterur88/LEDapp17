@@ -76,11 +76,17 @@ class GuiManager:
                  border: 1px solid #777; border-radius: 3px; background-color: #555;
                  color: #E0E0E0; selection-background-color: #0078D7;
              }
-             QComboBox::drop-down { border: none; }
-             QComboBox QAbstractItemView {
-                 background-color: #555; border: 1px solid #777;
-                 selection-background-color: #0078D7; color: #E0E0E0;
-             }
+            QComboBox::drop-down { border: none; }
+            QComboBox::down-arrow {
+                width: 0; height: 0; margin-right: 6px;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 7px solid #E0E0E0;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #555; border: 1px solid #777;
+                selection-background-color: #0078D7; color: #E0E0E0;
+            }
              QLineEdit {
                  font-family: Arial; min-height: 1.8em; padding: 1px 3px;
                  border: 1px solid #777; border-radius: 3px;
