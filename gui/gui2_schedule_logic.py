@@ -125,6 +125,76 @@ def _save_profiles_to_file(main_app):
         return False
 
 
+def check_profile_conflicts(main_app, target_name):
+    """Egyszerű ütközésvizsgálat az aktivált profilok között.
+
+    Csak az explicit on/off időket hasonlítjuk össze. A napkelte/napnyugta
+    alapú beállításokat nem ellenőrizzük, mert azok pontos ideje helyfüggő.
+
+    Args:
+        main_app: Az alkalmazás fő objektuma, amely tartalmazza a profilokat.
+        target_name: A vizsgálandó profil neve.
+
+    Returns:
+        List[str]: Napok és profilnevek, amelyek ütköznek a célprofillal.
+    """
+
+    target = main_app.profiles.get(target_name)
+    if not target:
+        return []
+
+    def parse_intervals(day_data):
+        """Parses a day's schedule and returns list of minute intervals.
+
+        Splits intervals that cross midnight into two parts to simplify
+        overlap checking.
+        """
+        if not day_data:
+            return []
+        if day_data.get("sunrise") or day_data.get("sunset"):
+            return []
+        on_str = day_data.get("on_time")
+        off_str = day_data.get("off_time")
+        if not on_str or not off_str:
+            return []
+        try:
+            on_t = dt_time.fromisoformat(on_str)
+            off_t = dt_time.fromisoformat(off_str)
+        except ValueError:
+            return []
+
+        start = on_t.hour * 60 + on_t.minute
+        end = off_t.hour * 60 + off_t.minute
+
+        if end > start:
+            return [(start, end)]
+        else:
+            # Crosses midnight -> split into two intervals
+            return [(start, 24 * 60), (0, end)]
+
+    conflicts = []
+    for other_name, other in main_app.profiles.items():
+        if other_name == target_name or not other.get("active", False):
+            continue
+        for day in DAYS:
+            intervals1 = parse_intervals(target.get("schedule", {}).get(day, {}))
+            intervals2 = parse_intervals(other.get("schedule", {}).get(day, {}))
+            if not intervals1 or not intervals2:
+                continue
+            overlap = False
+            for s1, e1 in intervals1:
+                for s2, e2 in intervals2:
+                    if s1 < e2 and s2 < e1:
+                        conflicts.append(f"{day} - {other_name}")
+                        overlap = True
+                        break
+                if overlap:
+                    break
+            if overlap:
+                break
+    return conflicts
+
+
 def save_profile(gui_widget):
     """
     Elmenti az aktuális ütemezési beállításokat JSON fájlba a GUI widgetek alapján.
@@ -193,6 +263,7 @@ def save_profile(gui_widget):
         if _save_profiles_to_file(gui_widget.main_app):
             QMessageBox.information(gui_widget, "Mentés sikeres", "Az ütemezés sikeresen elmentve.")
             gui_widget.main_app.schedule = schedule_to_save
+            gui_widget.unsaved_changes = False
         else:
             QMessageBox.critical(gui_widget, "Mentési hiba", "Nem sikerült a profilok mentése.")
     except Exception as e:
