@@ -263,6 +263,7 @@ def check_profiles(gui_widget):
 
     main_app = gui_widget.main_app
     desired_hex = None
+    schedule_entries_found = False
 
     try:
         for name, prof in main_app.profiles.items():
@@ -311,6 +312,7 @@ def check_profiles(gui_widget):
                         pass
 
             if on_time_dt and off_time_dt:
+                schedule_entries_found = True
                 target_color_name = day_data.get("color", "")
                 target_color_hex = next((c[2] for c in COLORS if c[0] == target_color_name), None)
                 if not target_color_hex:
@@ -324,7 +326,7 @@ def check_profiles(gui_widget):
                 if gui_widget.controls_widget:
                     gui_widget.controls_widget.send_color_command(desired_hex)
         else:
-            if main_app.is_led_on and gui_widget.controls_widget:
+            if schedule_entries_found and main_app.is_led_on and gui_widget.controls_widget:
                 gui_widget.controls_widget.turn_off_led()
 
     except Exception as e:
