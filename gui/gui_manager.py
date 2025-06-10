@@ -61,6 +61,12 @@ class GuiManager:
             QPushButton#powerOnButton { background-color: #308030; }
             QPushButton#powerOnButton:hover { background-color: #409040; }
             QPushButton#powerOnButton:pressed { background-color: #207020; }
+            QPushButton#addProfileButton,
+            QPushButton#deleteProfileButton,
+            QPushButton#customColorButton {
+                min-width: 5em;
+                min-height: 1.6em;
+            }
             QListWidget {
                 font-family: Arial; font-size: 11pt; background-color: #444;
                 color: #E0E0E0; border: 1px solid #777;

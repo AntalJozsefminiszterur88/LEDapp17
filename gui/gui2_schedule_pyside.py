@@ -165,16 +165,19 @@ class GUI2_Widget(QWidget):
         profile_container.addLayout(profile_layout)
 
         add_profile_btn = QPushButton("Új profil")
+        add_profile_btn.setObjectName("addProfileButton")
         add_profile_btn.setFixedSize(80, 25)
         add_profile_btn.clicked.connect(self.add_profile)
         profile_container.addWidget(add_profile_btn, 0, Qt.AlignmentFlag.AlignLeft)
 
         delete_profile_btn = QPushButton("Profil törlése")
+        delete_profile_btn.setObjectName("deleteProfileButton")
         delete_profile_btn.setFixedSize(80, 25)
         delete_profile_btn.clicked.connect(self.delete_profile)
         profile_container.addWidget(delete_profile_btn, 0, Qt.AlignmentFlag.AlignLeft)
 
         custom_color_btn = QPushButton("Egyedi szín...")
+        custom_color_btn.setObjectName("customColorButton")
         custom_color_btn.setFixedSize(80, 25)
         custom_color_btn.clicked.connect(self.controls_widget.pick_custom_color)
         profile_container.addWidget(custom_color_btn, 0, Qt.AlignmentFlag.AlignLeft)
