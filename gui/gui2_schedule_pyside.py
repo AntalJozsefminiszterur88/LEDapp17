@@ -11,7 +11,7 @@ import sys # sys import
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGridLayout,
     QComboBox, QLineEdit, QCheckBox, QFrame, QSpacerItem, QSizePolicy,
-    QMessageBox, QInputDialog # QGroupBox eltávolítva
+    QMessageBox, QInputDialog, QSlider # QGroupBox eltávolítva
 )
 from PySide6.QtCore import Qt, QTimer, Slot, QTime
 from PySide6.QtGui import QFont, QColor
@@ -173,7 +173,27 @@ class GUI2_Widget(QWidget):
         delete_profile_btn.setFixedWidth(40)
         delete_profile_btn.clicked.connect(self.delete_profile)
         profile_container.addWidget(delete_profile_btn, 0, Qt.AlignmentFlag.AlignLeft)
-        main_layout.addLayout(profile_container)
+
+        # --- Fényerő Csúszka ---
+        brightness_layout = QVBoxLayout()
+        brightness_label = QLabel("Fényerő")
+        brightness_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.brightness_slider = QSlider(Qt.Orientation.Vertical)
+        self.brightness_slider.setRange(0, 100)
+        start_value = config_manager.get_setting("brightness_level")
+        if not isinstance(start_value, int):
+            start_value = 80
+        self.brightness_slider.setValue(start_value)
+        self.brightness_slider.setTickPosition(QSlider.TickPosition.NoTicks)
+        self.brightness_slider.valueChanged.connect(self.change_brightness)
+        brightness_layout.addWidget(brightness_label)
+        brightness_layout.addWidget(self.brightness_slider)
+
+        profile_brightness_layout = QHBoxLayout()
+        profile_brightness_layout.addLayout(profile_container)
+        profile_brightness_layout.addLayout(brightness_layout)
+        profile_brightness_layout.addStretch(1)
+        main_layout.addLayout(profile_brightness_layout)
 
         # --- Ütemező Táblázat (GroupBox nélkül) ---
         table_container = QWidget()
@@ -276,6 +296,17 @@ class GUI2_Widget(QWidget):
     def mark_unsaved(self):
         """Jelzi, hogy módosítás történt a jelenlegi profilon."""
         self.unsaved_changes = self.is_schedule_modified()
+
+    @Slot(int)
+    def change_brightness(self, value: int):
+        """Fényerő módosítása a csúszkáról."""
+        hex_val = f"{max(0, min(100, value)):02x}"
+        cmd = f"7e0001{hex_val}00000000ef"
+        self.main_app.async_helper.run_async_task(
+            self.main_app.ble.send_command(cmd),
+            callback_error_signal=self.main_app.command_error_signal,
+        )
+        config_manager.set_setting("brightness_level", value)
 
     def is_schedule_modified(self):
         """Összehasonlítja a jelenlegi beállításokat a mentett profillal."""

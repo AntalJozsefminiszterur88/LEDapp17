@@ -27,6 +27,7 @@ DEFAULT_SETTINGS = {
     "last_device_address": None,
     "last_device_name": None, # Hozzáadva a név is
     "auto_connect_on_startup": True, # Új beállítás: automatikus csatlakozás induláskor
+    "brightness_level": 80,  # Fényerő százalékos értéke (0-100)
 }
 
 def _get_settings_path():
