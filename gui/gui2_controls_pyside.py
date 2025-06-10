@@ -2,11 +2,21 @@
 
 import time
 import asyncio
-from PySide6.QtWidgets import QWidget, QPushButton, QHBoxLayout, QVBoxLayout, QGridLayout, QSizePolicy
+from PySide6.QtWidgets import (
+    QWidget,
+    QPushButton,
+    QHBoxLayout,
+    QVBoxLayout,
+    QGridLayout,
+    QSizePolicy,
+    QLabel,
+    QSlider,
+)
 from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QFont, QPalette, QColor
 
-from config import COLORS # Importáljuk a színeket
+from config import COLORS  # Importáljuk a színeket
+import core.config_manager as config_manager
 
 # Logolás importálása, ha kell
 try:
@@ -74,6 +84,24 @@ class GUI2_ControlsWidget(QWidget):
         self.power_on_btn.clicked.connect(self.turn_on_led)
         power_layout.addWidget(self.power_on_btn)
         main_layout.addWidget(power_frame_widget)
+
+        # --- Fényerő Csúszka ---
+        brightness_widget = QWidget()
+        brightness_layout = QVBoxLayout(brightness_widget)
+        brightness_layout.setSpacing(5)
+        brightness_label = QLabel("Fényerő")
+        brightness_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.brightness_slider = QSlider(Qt.Orientation.Vertical)
+        self.brightness_slider.setRange(0, 100)
+        start_value = config_manager.get_setting("brightness_level")
+        if not isinstance(start_value, int):
+            start_value = 80
+        self.brightness_slider.setValue(start_value)
+        self.brightness_slider.setTickPosition(QSlider.TickPosition.NoTicks)
+        self.brightness_slider.valueChanged.connect(self.change_brightness)
+        brightness_layout.addWidget(brightness_label)
+        brightness_layout.addWidget(self.brightness_slider)
+        main_layout.addWidget(brightness_widget)
 
         self.update_power_buttons()
 
@@ -144,3 +172,14 @@ class GUI2_ControlsWidget(QWidget):
             self.power_off_btn.setStyleSheet("background-color: #dddddd; color: #888888; border: 1px solid #aaaaaa; border-radius: 3px;")
             self.power_on_btn.setEnabled(True)
             self.power_on_btn.setStyleSheet("background-color: #4CAF50; color: white; border: 1px solid #555; border-radius: 3px;")
+
+    @Slot(int)
+    def change_brightness(self, value: int):
+        """Fényerő módosítása a csúszkáról."""
+        hex_val = f"{max(0, min(100, value)):02x}"
+        cmd = f"7e0001{hex_val}00000000ef"
+        self.main_app.async_helper.run_async_task(
+            self.main_app.ble.send_command(cmd),
+            callback_error_signal=self.main_app.command_error_signal,
+        )
+        config_manager.set_setting("brightness_level", value)
