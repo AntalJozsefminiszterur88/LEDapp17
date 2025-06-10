@@ -1,0 +1,26 @@
+import json
+from typing import List, Dict
+
+from config import CUSTOM_COLORS_FILE, CUSTOM_COLORS, COLORS
+
+
+def save_custom_colors_list():
+    try:
+        with open(CUSTOM_COLORS_FILE, "w", encoding="utf-8") as f:
+            json.dump(CUSTOM_COLORS, f, ensure_ascii=False, indent=4)
+    except Exception:
+        pass
+
+
+def add_custom_color(name: str, hex_code: str):
+    hex_code = hex_code.lstrip('#')
+    entry = {"name": name, "hex": f"#{hex_code}"}
+    CUSTOM_COLORS.append(entry)
+    COLORS.append((name, f"#{hex_code}", f"7e000503{hex_code}00ef"))
+    save_custom_colors_list()
+
+
+def delete_custom_color(name: str):
+    CUSTOM_COLORS[:] = [c for c in CUSTOM_COLORS if c.get("name") != name]
+    COLORS[:] = [c for c in COLORS if c[0] != name]
+    save_custom_colors_list()

@@ -37,37 +37,11 @@ class GUI2_ControlsWidget(QWidget):
         main_layout.setSpacing(20)
 
         # --- Színes Gombok Rácsa ---
-        color_grid_widget = QWidget()
-        color_grid_layout = QGridLayout(color_grid_widget)
-        color_grid_layout.setSpacing(5)
-
-        colors_per_row = 4
-        for i, (name, tk_color, hex_code) in enumerate(COLORS):
-            row = i // colors_per_row
-            col = i % colors_per_row
-            btn = QPushButton(name)
-            font = QFont("Arial", 12)
-            btn.setFont(font)
-            btn.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-            btn.setMinimumSize(100, 40)
-            btn.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: {tk_color};
-                    color: {self.get_contrasting_text_color(tk_color)};
-                    border: 1px solid #555;
-                    border-radius: 3px;
-                }}
-                QPushButton:pressed {{
-                    background-color: {self.adjust_color(tk_color, -30)};
-                }}
-            """)
-            btn.clicked.connect(lambda checked=False, h=hex_code: self.send_color_command(h))
-            color_grid_layout.addWidget(btn, row, col)
-
-        # Egyedi színválasztó gomb a színgombok alatt (eltávolítva, a GUI2-ben kerül elhelyezésre)
-        total_rows = (len(COLORS) + colors_per_row - 1) // colors_per_row
-        color_grid_layout.setRowStretch(total_rows, 0)
-        main_layout.addWidget(color_grid_widget, 0, Qt.AlignmentFlag.AlignTop)
+        self.color_grid_widget = QWidget()
+        self.color_grid_layout = QGridLayout(self.color_grid_widget)
+        self.color_grid_layout.setSpacing(5)
+        self.build_color_buttons()
+        main_layout.addWidget(self.color_grid_widget, 0, Qt.AlignmentFlag.AlignTop)
 
         # --- Ki/Bekapcsoló Gombok ---
         power_frame_widget = QWidget()
@@ -127,6 +101,38 @@ class GUI2_ControlsWidget(QWidget):
              return f"#{r:02x}{g:02x}{b:02x}"
         except Exception:
              return hex_color
+
+    def build_color_buttons(self):
+        while self.color_grid_layout.count():
+            item = self.color_grid_layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
+
+        colors_per_row = 4
+        for i, (name, tk_color, hex_code) in enumerate(COLORS):
+            row = i // colors_per_row
+            col = i % colors_per_row
+            btn = QPushButton(name)
+            font = QFont("Arial", 12)
+            btn.setFont(font)
+            btn.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+            btn.setMinimumSize(100, 40)
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {tk_color};
+                    color: {self.get_contrasting_text_color(tk_color)};
+                    border: 1px solid #555;
+                    border-radius: 3px;
+                }}
+                QPushButton:pressed {{
+                    background-color: {self.adjust_color(tk_color, -30)};
+                }}
+            """)
+            btn.clicked.connect(lambda checked=False, h=hex_code: self.send_color_command(h))
+            self.color_grid_layout.addWidget(btn, row, col)
+        total_rows = (len(COLORS) + colors_per_row - 1) // colors_per_row
+        self.color_grid_layout.setRowStretch(total_rows, 0)
 
     def pick_custom_color(self):
         """Megnyit egy színválasztó párbeszédablakot és elküldi a kiválasztott színt."""

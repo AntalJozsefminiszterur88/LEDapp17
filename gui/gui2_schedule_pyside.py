@@ -32,6 +32,7 @@ try:
     from core.location_utils import get_sun_times, LOCAL_TZ
     from gui import gui2_schedule_logic as logic
     from gui.gui2_controls_pyside import GUI2_ControlsWidget
+    from gui.custom_color_dialog import CustomColorDialog
     logic.LOCAL_TZ = LOCAL_TZ
     log_event("GUI2Schedule: Szükséges modulok sikeresen importálva.")
 
@@ -176,10 +177,10 @@ class GUI2_Widget(QWidget):
         delete_profile_btn.clicked.connect(self.delete_profile)
         profile_container.addWidget(delete_profile_btn, 0, Qt.AlignmentFlag.AlignLeft)
 
-        custom_color_btn = QPushButton("Egyedi szín...")
+        custom_color_btn = QPushButton("Egyedi színek...")
         custom_color_btn.setObjectName("customColorButton")
-        custom_color_btn.setFixedSize(80, 25)
-        custom_color_btn.clicked.connect(self.controls_widget.pick_custom_color)
+        custom_color_btn.setFixedSize(100, 25)
+        custom_color_btn.clicked.connect(self.open_custom_colors)
         profile_container.addWidget(custom_color_btn, 0, Qt.AlignmentFlag.AlignLeft)
 
         main_layout.addLayout(profile_container)
@@ -499,3 +500,24 @@ class GUI2_Widget(QWidget):
         except Exception as e:
             log_event(f"Hiba az idő frissítésekor: {e}")
             self.time_label.setText("Idő hiba")
+
+    @Slot()
+    def open_custom_colors(self):
+        dialog = CustomColorDialog(self)
+        dialog.exec()
+        self.controls_widget.build_color_buttons()
+        self.refresh_color_inputs()
+
+    def refresh_color_inputs(self):
+        names = ["Nincs kiválasztva"] + [c[0] for c in COLORS]
+        for widgets in self.schedule_widgets.values():
+            cb = widgets["color"]
+            current = cb.currentText()
+            cb.blockSignals(True)
+            cb.clear()
+            cb.addItems(names)
+            if current in names:
+                cb.setCurrentText(current)
+            else:
+                cb.setCurrentIndex(0)
+            cb.blockSignals(False)
