@@ -5,7 +5,7 @@ import threading
 import traceback
 from concurrent.futures import Future
 
-from PySide6.QtCore import QMetaObject, Qt, Q_ARG, Signal
+from PySide6.QtCore import Q_ARG, QMetaObject, Qt, Signal
 
 # Logolás importálása
 try:
@@ -15,9 +15,11 @@ except ImportError:
         from ..core.reconnect_handler import log_event
     except ImportError:
         print("HIBA: Nem sikerült importálni a log_eventet az async_helper.py-ban.")
+
         # Definiáljunk egy dummy loggert, hogy ne álljon le a program
         def log_event(msg):
             print(f"[LOG - Dummy AsyncHelper]: {msg}")
+
 
 class AsyncHelper:
     """Segédosztály az aszinkron műveletek kezelésére."""
@@ -29,13 +31,15 @@ class AsyncHelper:
         Args:
             app_instance: A fő LEDApp_BaseWindow példány.
         """
-        self.app = app_instance # Referencia a fő alkalmazásra
+        self.app = app_instance  # Referencia a fő alkalmazásra
         self.loop = asyncio.new_event_loop()
-        self.event_loop_thread = threading.Thread(target=self._run_dedicated_asyncio_loop, daemon=True)
+        self.event_loop_thread = threading.Thread(
+            target=self._run_dedicated_asyncio_loop, daemon=True
+        )
         self.event_loop_thread.start()
 
     def _run_dedicated_asyncio_loop(self):
-        """ A dedikált szálon futó asyncio eseményhurok. """
+        """A dedikált szálon futó asyncio eseményhurok."""
         log_event("Asyncio event loop thread started.")
         asyncio.set_event_loop(self.loop)
         try:
@@ -47,24 +51,37 @@ class AsyncHelper:
                 all_tasks = asyncio.all_tasks(self.loop)
                 if all_tasks:
                     # A current_task csak futó loopban lekérdezhető biztonságosan
-                    current_task = asyncio.current_task(self.loop) if self.loop.is_running() else None
-                    tasks_to_cancel = {task for task in all_tasks if task is not current_task}
+                    current_task = (
+                        asyncio.current_task(self.loop)
+                        if self.loop.is_running()
+                        else None
+                    )
+                    tasks_to_cancel = {
+                        task for task in all_tasks if task is not current_task
+                    }
                     if tasks_to_cancel:
                         log_event(f"Cancelling {len(tasks_to_cancel)} asyncio tasks...")
-                        for task in tasks_to_cancel: task.cancel()
+                        for task in tasks_to_cancel:
+                            task.cancel()
                         # Várakozás a task-okra (hiba esetén is folytatódik)
                         # Timeout hozzáadása a végtelen várakozás elkerülésére
-                        gather_future = asyncio.gather(*tasks_to_cancel, return_exceptions=True)
+                        gather_future = asyncio.gather(
+                            *tasks_to_cancel, return_exceptions=True
+                        )
                         try:
-                             if self.loop.is_running():
-                                 self.loop.run_until_complete(asyncio.wait_for(gather_future, timeout=2.0))
+                            if self.loop.is_running():
+                                self.loop.run_until_complete(
+                                    asyncio.wait_for(gather_future, timeout=2.0)
+                                )
                         except asyncio.TimeoutError:
-                             log_event("Timeout during asyncio task cancellation.")
+                            log_event("Timeout during asyncio task cancellation.")
                         except RuntimeError as e:
-                             log_event(f"RuntimeError during asyncio task gather: {e}")
+                            log_event(f"RuntimeError during asyncio task gather: {e}")
 
-            except RuntimeError as e: log_event(f"RuntimeError during asyncio task cleanup: {e}")
-            except Exception as e: log_event(f"Error during asyncio task cleanup: {e}")
+            except RuntimeError as e:
+                log_event(f"RuntimeError during asyncio task cleanup: {e}")
+            except Exception as e:
+                log_event(f"Error during asyncio task cleanup: {e}")
 
             # Loop bezárása, ha még futott (a stop után)
             if self.loop.is_running():
@@ -78,7 +95,9 @@ class AsyncHelper:
             self.loop.close()
             log_event("Asyncio event loop thread finished.")
 
-    def run_async_task(self, coro, callback_success_signal=None, callback_error_signal=None):
+    def run_async_task(
+        self, coro, callback_success_signal=None, callback_error_signal=None
+    ):
         """
         Futtat egy coroutine-t és signalokat bocsát ki az eredménnyel/hibával.
 
@@ -94,9 +113,11 @@ class AsyncHelper:
             error_msg = "Hiba: Az asyncio eseményhurok nem fut."
             log_event(error_msg)
             if callback_error_signal and isinstance(callback_error_signal, Signal):
-                 callback_error_signal.emit(error_msg)
+                callback_error_signal.emit(error_msg)
             else:
-                 log_event(f"HIBA: Nem található vagy nem Signal a megadott error callback: {callback_error_signal}")
+                log_event(
+                    f"HIBA: Nem található vagy nem Signal a megadott error callback: {callback_error_signal}"
+                )
             return None
 
         future: Future = asyncio.run_coroutine_threadsafe(coro, self.loop)
@@ -104,10 +125,16 @@ class AsyncHelper:
         def done_callback(f):
             try:
                 result = f.result()
-                log_event(f"AsyncHelper: Task successful. Result type: {type(result)}, Value: {result}")
-                if callback_success_signal and isinstance(callback_success_signal, Signal):
+                log_event(
+                    f"AsyncHelper: Task successful. Result type: {type(result)}, Value: {result}"
+                )
+                if callback_success_signal and isinstance(
+                    callback_success_signal, Signal
+                ):
                     # Név logolása nélkül
-                    log_event(f"AsyncHelper: Emitting success signal with data type {type(result)}...")
+                    log_event(
+                        f"AsyncHelper: Emitting success signal with data type {type(result)}..."
+                    )
                     callback_success_signal.emit(result)
                 # else: # Ezt a logot kikommentezhetjük, ha zavaró
                 #    log_event(f"Figyelmeztetés: Nincs vagy nem Signal a megadott success callback: {callback_success_signal}")
@@ -118,15 +145,21 @@ class AsyncHelper:
                     return
 
                 bleak_error_msg = ""
-                if hasattr(e, 'dbus_error'): bleak_error_msg = f" (DBus Error: {getattr(e, 'dbus_error_details', '')})"
-                elif hasattr(e, 'winrt_error'): bleak_error_msg = f" (WinRT Error: {e.winrt_error})"
+                if hasattr(e, "dbus_error"):
+                    bleak_error_msg = (
+                        f" (DBus Error: {getattr(e, 'dbus_error_details', '')})"
+                    )
+                elif hasattr(e, "winrt_error"):
+                    bleak_error_msg = f" (WinRT Error: {e.winrt_error})"
                 error_message = f"{type(e).__name__}: {e}{bleak_error_msg}"
                 log_event(f"AsyncHelper: Task failed. Error: {error_message}")
-                log_event(f"Traceback:\n{traceback.format_exc()}") # Hibakereséshez adjuk hozzá a tracebacket
+                log_event(
+                    f"Traceback:\n{traceback.format_exc()}"
+                )  # Hibakereséshez adjuk hozzá a tracebacket
                 if callback_error_signal and isinstance(callback_error_signal, Signal):
-                     # Név logolása nélkül
-                     log_event(f"AsyncHelper: Emitting error signal...")
-                     callback_error_signal.emit(error_message)
+                    # Név logolása nélkül
+                    log_event(f"AsyncHelper: Emitting error signal...")
+                    callback_error_signal.emit(error_message)
                 # else: # Ezt a logot kikommentezhetjük, ha zavaró
                 #    log_event(f"HIBA: Nem található vagy nem Signal a megadott error callback: {callback_error_signal}")
 

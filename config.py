@@ -25,5 +25,5 @@ COLORS = [
     ("Cian", "#00ffff", "7e00050300ffff00ef"),
     ("Lila", "#800080", "7e00050380008000ef"),
     ("Narancs", "#ffa500", "7e000503ffa50000ef"),
-    ("Fehér", "#ffffff", "7e000503ffffff00ef")
+    ("Fehér", "#ffffff", "7e000503ffffff00ef"),
 ]

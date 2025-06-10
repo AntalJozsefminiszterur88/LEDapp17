@@ -2,17 +2,21 @@
 
 import json
 import os
-from datetime import datetime, timedelta, time as dt_time
 import traceback
-import pytz
+from datetime import datetime
+from datetime import time as dt_time
+from datetime import timedelta
 
-from PySide6.QtWidgets import QMessageBox
+import pytz
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QMessageBox
 
 # Importáljuk a szükséges konfigurációs és backend/core elemeket
-from config import COLORS, DAYS, CONFIG_FILE, PROFILES_FILE
-from core.sun_logic import get_local_sun_info, get_hungarian_day_name, DAYS_HU
-from core.location_utils import get_sun_times # Bár itt nincs közvetlen hívás, a main_app tartalmazza
+from config import COLORS, CONFIG_FILE, DAYS, PROFILES_FILE
+from core.location_utils import (
+    get_sun_times,
+)  # Bár itt nincs közvetlen hívás, a main_app tartalmazza
+from core.sun_logic import DAYS_HU, get_hungarian_day_name, get_local_sun_info
 
 # --- Időzóna Definíció ---
 # Biztosítjuk, hogy a LOCAL_TZ létezzen
@@ -20,6 +24,7 @@ try:
     # Próbáljuk meg a rendszer alapértelmezett időzónáját használni, ha lehetséges
     try:
         import tzlocal
+
         LOCAL_TZ = tzlocal.get_localzone()
         print(f"Helyi időzóna (tzlocal - logic): {LOCAL_TZ.zone}")
     except ImportError:
@@ -34,6 +39,7 @@ except Exception as e:
     LOCAL_TZ = pytz.utc
 
 # --- Logika Függvények ---
+
 
 def get_default_schedule():
     """Alapértelmezett ütemezés létrehozása."""
@@ -54,7 +60,9 @@ def get_default_schedule():
 def load_profiles_from_file(main_app):
     """Betölti az ütemezési profilokat."""
     default_schedule = get_default_schedule()
-    default_profiles = {"Alapértelmezett": {"active": True, "schedule": default_schedule}}
+    default_profiles = {
+        "Alapértelmezett": {"active": True, "schedule": default_schedule}
+    }
 
     if os.path.exists(PROFILES_FILE):
         try:
@@ -111,7 +119,9 @@ def load_profiles_from_file(main_app):
         except Exception as e:
             print(f"Hiba a régi ütemezés betöltésekor: {e}")
 
-    main_app.profiles = {"Alapértelmezett": {"active": True, "schedule": single_schedule}}
+    main_app.profiles = {
+        "Alapértelmezett": {"active": True, "schedule": single_schedule}
+    }
 
 
 def _save_profiles_to_file(main_app):
@@ -215,23 +225,33 @@ def save_profile(gui_widget):
                     dt_time.fromisoformat(on_time_val)
                     temp_data["on_time"] = on_time_val
                 except ValueError:
-                     raise ValueError(f"Érvénytelen bekapcsolási idő formátum: '{on_time_val}'. HH:MM formátum szükséges.")
+                    raise ValueError(
+                        f"Érvénytelen bekapcsolási idő formátum: '{on_time_val}'. HH:MM formátum szükséges."
+                    )
 
             if not temp_data["sunset"] and off_time_val:
-                 try:
-                     dt_time.fromisoformat(off_time_val)
-                     temp_data["off_time"] = off_time_val
-                 except ValueError:
-                     raise ValueError(f"Érvénytelen kikapcsolási idő formátum: '{off_time_val}'. HH:MM formátum szükséges.")
+                try:
+                    dt_time.fromisoformat(off_time_val)
+                    temp_data["off_time"] = off_time_val
+                except ValueError:
+                    raise ValueError(
+                        f"Érvénytelen kikapcsolási idő formátum: '{off_time_val}'. HH:MM formátum szükséges."
+                    )
 
             schedule_to_save[day] = temp_data
 
         except ValueError as ve:
-            QMessageBox.critical(gui_widget, "Hiba", f"Érvénytelen érték a '{day}' napnál: {ve}. Kérlek javítsd (idő HH:MM, offset egész szám).")
+            QMessageBox.critical(
+                gui_widget,
+                "Hiba",
+                f"Érvénytelen érték a '{day}' napnál: {ve}. Kérlek javítsd (idő HH:MM, offset egész szám).",
+            )
             valid = False
             break
         except Exception as e:
-            QMessageBox.critical(gui_widget, "Hiba", f"Váratlan hiba a '{day}' nap feldolgozásakor: {e}")
+            QMessageBox.critical(
+                gui_widget, "Hiba", f"Váratlan hiba a '{day}' nap feldolgozásakor: {e}"
+            )
             valid = False
             break
 
@@ -241,25 +261,32 @@ def save_profile(gui_widget):
     try:
         profile_name = getattr(gui_widget, "current_profile_name", None)
         if not profile_name:
-            QMessageBox.critical(gui_widget, "Hiba", "Nincs kiválasztott profil a mentéshez.")
+            QMessageBox.critical(
+                gui_widget, "Hiba", "Nincs kiválasztott profil a mentéshez."
+            )
             return
 
         gui_widget.main_app.profiles[profile_name]["schedule"] = schedule_to_save
         if _save_profiles_to_file(gui_widget.main_app):
-            QMessageBox.information(gui_widget, "Mentés sikeres", "Az ütemezés sikeresen elmentve.")
+            QMessageBox.information(
+                gui_widget, "Mentés sikeres", "Az ütemezés sikeresen elmentve."
+            )
             gui_widget.main_app.schedule = schedule_to_save
             gui_widget.unsaved_changes = False
         else:
-            QMessageBox.critical(gui_widget, "Mentési hiba", "Nem sikerült a profilok mentése.")
+            QMessageBox.critical(
+                gui_widget, "Mentési hiba", "Nem sikerült a profilok mentése."
+            )
     except Exception as e:
-        QMessageBox.critical(gui_widget, "Mentési hiba", f"Hiba történt a mentés során: {e}")
-
+        QMessageBox.critical(
+            gui_widget, "Mentési hiba", f"Hiba történt a mentés során: {e}"
+        )
 
 
 def check_profiles(gui_widget):
     """Aktív ütemezési profilok ellenőrzése és LED vezérlése."""
     now_local = datetime.now(LOCAL_TZ)
-    today_name_hu = DAYS_HU.get(now_local.strftime('%A'), now_local.strftime('%A'))
+    today_name_hu = DAYS_HU.get(now_local.strftime("%A"), now_local.strftime("%A"))
 
     main_app = gui_widget.main_app
     desired_hex = None
@@ -289,7 +316,9 @@ def check_profiles(gui_widget):
                 if on_str:
                     try:
                         time_obj = dt_time.fromisoformat(on_str)
-                        on_time_dt = LOCAL_TZ.localize(datetime.combine(now_local.date(), time_obj))
+                        on_time_dt = LOCAL_TZ.localize(
+                            datetime.combine(now_local.date(), time_obj)
+                        )
                     except ValueError:
                         pass
 
@@ -305,7 +334,9 @@ def check_profiles(gui_widget):
                 if off_str:
                     try:
                         time_obj = dt_time.fromisoformat(off_str)
-                        off_time_dt = LOCAL_TZ.localize(datetime.combine(now_local.date(), time_obj))
+                        off_time_dt = LOCAL_TZ.localize(
+                            datetime.combine(now_local.date(), time_obj)
+                        )
                         if on_time_dt and off_time_dt <= on_time_dt:
                             off_time_dt += timedelta(days=1)
                     except ValueError:
@@ -314,7 +345,9 @@ def check_profiles(gui_widget):
             if on_time_dt and off_time_dt:
                 schedule_entries_found = True
                 target_color_name = day_data.get("color", "")
-                target_color_hex = next((c[2] for c in COLORS if c[0] == target_color_name), None)
+                target_color_hex = next(
+                    (c[2] for c in COLORS if c[0] == target_color_name), None
+                )
                 if not target_color_hex:
                     continue
                 if on_time_dt <= now_local < off_time_dt:
@@ -326,7 +359,11 @@ def check_profiles(gui_widget):
                 if gui_widget.controls_widget:
                     gui_widget.controls_widget.send_color_command(desired_hex)
         else:
-            if schedule_entries_found and main_app.is_led_on and gui_widget.controls_widget:
+            if (
+                schedule_entries_found
+                and main_app.is_led_on
+                and gui_widget.controls_widget
+            ):
                 gui_widget.controls_widget.turn_off_led()
 
     except Exception as e:
