@@ -140,7 +140,8 @@ class GUI2_Widget(QWidget):
         if not hasattr(self.main_app, 'profiles') or not self.main_app.profiles:
             self.main_app.profiles = {"Alap": {"active": True, "schedule": logic.get_default_schedule()}}
 
-        self.current_profile_name = list(self.main_app.profiles.keys())[0]
+        self.default_profile_name = list(self.main_app.profiles.keys())[0]
+        self.current_profile_name = self.default_profile_name
         self.main_app.schedule = self.main_app.profiles[self.current_profile_name]["schedule"]
         self.unsaved_changes = False
 
@@ -164,9 +165,14 @@ class GUI2_Widget(QWidget):
         profile_container.addLayout(profile_layout)
 
         add_profile_btn = QPushButton("Új profil")
-        add_profile_btn.setFixedWidth(80)
+        add_profile_btn.setFixedWidth(40)
         add_profile_btn.clicked.connect(self.add_profile)
         profile_container.addWidget(add_profile_btn, 0, Qt.AlignmentFlag.AlignLeft)
+
+        delete_profile_btn = QPushButton("Profil törlése")
+        delete_profile_btn.setFixedWidth(40)
+        delete_profile_btn.clicked.connect(self.delete_profile)
+        profile_container.addWidget(delete_profile_btn, 0, Qt.AlignmentFlag.AlignLeft)
         main_layout.addLayout(profile_container)
 
         # --- Ütemező Táblázat (GroupBox nélkül) ---
@@ -269,7 +275,31 @@ class GUI2_Widget(QWidget):
     @Slot()
     def mark_unsaved(self):
         """Jelzi, hogy módosítás történt a jelenlegi profilon."""
-        self.unsaved_changes = True
+        self.unsaved_changes = self.is_schedule_modified()
+
+    def is_schedule_modified(self):
+        """Összehasonlítja a jelenlegi beállításokat a mentett profillal."""
+        current = {}
+        for day, widgets in self.schedule_widgets.items():
+            try:
+                sr_off = int(widgets["sunrise_offset"].text()) if widgets["sunrise_offset"].text() else 0
+            except ValueError:
+                sr_off = 0
+            try:
+                ss_off = int(widgets["sunset_offset"].text()) if widgets["sunset_offset"].text() else 0
+            except ValueError:
+                ss_off = 0
+            current[day] = {
+                "color": widgets["color"].currentText(),
+                "on_time": widgets["on_time"].currentText(),
+                "off_time": widgets["off_time"].currentText(),
+                "sunrise": widgets["sunrise"].isChecked(),
+                "sunrise_offset": sr_off,
+                "sunset": widgets["sunset"].isChecked(),
+                "sunset_offset": ss_off,
+            }
+        original = self.main_app.profiles.get(self.current_profile_name, {}).get("schedule", {})
+        return current != original
 
     @Slot(str)
     def change_profile(self, name: str):
@@ -279,18 +309,20 @@ class GUI2_Widget(QWidget):
         if name == self.current_profile_name:
             return
         if self.unsaved_changes:
-            reply = QMessageBox.question(
-                self,
-                "Mentés",
-                "A módosítások nincsenek elmentve. Szeretnéd elmenteni a profil váltása előtt?",
-                QMessageBox.StandardButton.Yes
-                | QMessageBox.StandardButton.No
-                | QMessageBox.StandardButton.Cancel,
-                QMessageBox.StandardButton.Cancel,
-            )
-            if reply == QMessageBox.StandardButton.Yes:
+            mb = QMessageBox(self)
+            mb.setWindowTitle("Mentés")
+            mb.setText("A módosítások nincsenek elmentve. Szeretnéd elmenteni a profil váltása előtt?")
+            yes_btn = mb.addButton("Igen", QMessageBox.ButtonRole.YesRole)
+            no_btn = mb.addButton("Nem", QMessageBox.ButtonRole.NoRole)
+            cancel_btn = mb.addButton("Mégsem", QMessageBox.ButtonRole.RejectRole)
+            for b in (yes_btn, no_btn, cancel_btn):
+                b.setFixedWidth(int(b.sizeHint().width() * 0.5))
+            mb.setDefaultButton(cancel_btn)
+            mb.exec()
+            clicked = mb.clickedButton()
+            if clicked == yes_btn:
                 logic.save_profile(self)
-            elif reply == QMessageBox.StandardButton.Cancel:
+            elif clicked == cancel_btn:
                 self.profile_combo.blockSignals(True)
                 self.profile_combo.setCurrentText(self.current_profile_name)
                 self.profile_combo.blockSignals(False)
@@ -326,6 +358,30 @@ class GUI2_Widget(QWidget):
         self.profile_combo.addItem(name)
         self.profile_combo.setCurrentText(name)
         logic._save_profiles_to_file(self.main_app)
+
+    @Slot()
+    def delete_profile(self):
+        """Törli a kiválasztott profilt, ha nem az alapértelmezett."""
+        if self.current_profile_name == getattr(self, "default_profile_name", ""):
+            QMessageBox.information(self, "Hiba", "Az alapértelmezett profil nem törölhető.")
+            return
+        reply = QMessageBox.question(
+            self,
+            "Profil törlése",
+            f"Biztosan törlöd a(z) '{self.current_profile_name}' profilt?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        del self.main_app.profiles[self.current_profile_name]
+        idx = self.profile_combo.currentIndex()
+        self.profile_combo.removeItem(idx)
+        logic._save_profiles_to_file(self.main_app)
+        self.unsaved_changes = False
+        new_name = self.profile_combo.currentText()
+        if new_name:
+            self.change_profile(new_name)
 
     @Slot(int)
     def toggle_profile_active(self, state):
@@ -368,7 +424,7 @@ class GUI2_Widget(QWidget):
                 widgets["sunset_offset"].setText("0")
                 self.toggle_sun_time(Qt.CheckState.Unchecked.value, list(DAYS).index(day) * 2, day, "sunrise")
                 self.toggle_sun_time(Qt.CheckState.Unchecked.value, list(DAYS).index(day) * 2 + 1, day, "sunset")
-            self.unsaved_changes = True
+            self.unsaved_changes = self.is_schedule_modified()
 
 
     @Slot(int)
