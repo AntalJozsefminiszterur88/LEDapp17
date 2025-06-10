@@ -122,12 +122,12 @@ if __name__ == "__main__":
     if os.path.exists(icon_path):
         app_icon = QIcon(icon_path)
     elif getattr(sys, 'frozen', False):
-        base_path = os.path.dirname(sys.executable)
+        base_path = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
         frozen_icon_path = os.path.join(base_path, icon_path)
         if os.path.exists(frozen_icon_path):
             app_icon = QIcon(frozen_icon_path)
         else:
-             print(f"Figyelmeztetés: Az ikonfájl nem található a fagyasztott helyen sem: {frozen_icon_path}")
+            print(f"Figyelmeztetés: Az ikonfájl nem található a fagyasztott helyen sem: {frozen_icon_path}")
     else:
         print(f"Figyelmeztetés: Az ikonfájl nem található: {icon_path}")
 
