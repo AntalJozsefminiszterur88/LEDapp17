@@ -164,7 +164,7 @@ class GUI2_Widget(QWidget):
         profile_container.addLayout(profile_layout)
 
         add_profile_btn = QPushButton("Új profil")
-        add_profile_btn.setFixedWidth(80)
+        add_profile_btn.setFixedWidth(40)
         add_profile_btn.clicked.connect(self.add_profile)
         profile_container.addWidget(add_profile_btn, 0, Qt.AlignmentFlag.AlignLeft)
         main_layout.addLayout(profile_container)
@@ -269,7 +269,31 @@ class GUI2_Widget(QWidget):
     @Slot()
     def mark_unsaved(self):
         """Jelzi, hogy módosítás történt a jelenlegi profilon."""
-        self.unsaved_changes = True
+        self.unsaved_changes = self.is_schedule_modified()
+
+    def is_schedule_modified(self):
+        """Összehasonlítja a jelenlegi beállításokat a mentett profillal."""
+        current = {}
+        for day, widgets in self.schedule_widgets.items():
+            try:
+                sr_off = int(widgets["sunrise_offset"].text()) if widgets["sunrise_offset"].text() else 0
+            except ValueError:
+                sr_off = 0
+            try:
+                ss_off = int(widgets["sunset_offset"].text()) if widgets["sunset_offset"].text() else 0
+            except ValueError:
+                ss_off = 0
+            current[day] = {
+                "color": widgets["color"].currentText(),
+                "on_time": widgets["on_time"].currentText(),
+                "off_time": widgets["off_time"].currentText(),
+                "sunrise": widgets["sunrise"].isChecked(),
+                "sunrise_offset": sr_off,
+                "sunset": widgets["sunset"].isChecked(),
+                "sunset_offset": ss_off,
+            }
+        original = self.main_app.profiles.get(self.current_profile_name, {}).get("schedule", {})
+        return current != original
 
     @Slot(str)
     def change_profile(self, name: str):
@@ -279,18 +303,20 @@ class GUI2_Widget(QWidget):
         if name == self.current_profile_name:
             return
         if self.unsaved_changes:
-            reply = QMessageBox.question(
-                self,
-                "Mentés",
-                "A módosítások nincsenek elmentve. Szeretnéd elmenteni a profil váltása előtt?",
-                QMessageBox.StandardButton.Yes
-                | QMessageBox.StandardButton.No
-                | QMessageBox.StandardButton.Cancel,
-                QMessageBox.StandardButton.Cancel,
-            )
-            if reply == QMessageBox.StandardButton.Yes:
+            mb = QMessageBox(self)
+            mb.setWindowTitle("Mentés")
+            mb.setText("A módosítások nincsenek elmentve. Szeretnéd elmenteni a profil váltása előtt?")
+            yes_btn = mb.addButton("Igen", QMessageBox.ButtonRole.YesRole)
+            no_btn = mb.addButton("Nem", QMessageBox.ButtonRole.NoRole)
+            cancel_btn = mb.addButton("Mégsem", QMessageBox.ButtonRole.RejectRole)
+            for b in (yes_btn, no_btn, cancel_btn):
+                b.setFixedWidth(int(b.sizeHint().width() * 0.5))
+            mb.setDefaultButton(cancel_btn)
+            mb.exec()
+            clicked = mb.clickedButton()
+            if clicked == yes_btn:
                 logic.save_profile(self)
-            elif reply == QMessageBox.StandardButton.Cancel:
+            elif clicked == cancel_btn:
                 self.profile_combo.blockSignals(True)
                 self.profile_combo.setCurrentText(self.current_profile_name)
                 self.profile_combo.blockSignals(False)
@@ -368,7 +394,7 @@ class GUI2_Widget(QWidget):
                 widgets["sunset_offset"].setText("0")
                 self.toggle_sun_time(Qt.CheckState.Unchecked.value, list(DAYS).index(day) * 2, day, "sunrise")
                 self.toggle_sun_time(Qt.CheckState.Unchecked.value, list(DAYS).index(day) * 2 + 1, day, "sunset")
-            self.unsaved_changes = True
+            self.unsaved_changes = self.is_schedule_modified()
 
 
     @Slot(int)
