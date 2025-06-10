@@ -177,7 +177,7 @@ class GUI2_Widget(QWidget):
         delete_profile_btn.clicked.connect(self.delete_profile)
         profile_container.addWidget(delete_profile_btn, 0, Qt.AlignmentFlag.AlignLeft)
 
-        custom_color_btn = QPushButton("Egyedi színek...")
+        custom_color_btn = QPushButton("Egyedi szín")
         custom_color_btn.setObjectName("customColorButton")
         custom_color_btn.setFixedSize(100, 25)
         custom_color_btn.clicked.connect(self.open_custom_colors)
