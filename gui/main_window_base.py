@@ -254,28 +254,23 @@ class LEDApp_BaseWindow(QMainWindow):
                 config_manager.set_setting("last_device_name", self.selected_device[0])
                 log_event(f"Utolsó eszköz elmentve: {self.selected_device[0]} ({self.selected_device[1]})")
             else:
-                 log_event("Figyelmeztetés: Sikeres csatlakozás, de self.selected_device üres.")
+                log_event("Figyelmeztetés: Sikeres csatlakozás, de self.selected_device üres.")
 
             # Ha a GUI1 aktív, akkor váltsunk GUI2-re
             if isinstance(current_widget, GUI1_Widget):
                 if not self.gui_manager.load_gui2():
-                    self.connected = False # Hiba esetén visszaállítjuk
+                    self.connected = False  # Hiba esetén visszaállítjuk
                     current_widget.on_connect_finally()
             else:
+                # Ha nincs még GUI betöltve (pl. rejtett induláskor), töltsük be a GUI2-t
+                if not self._initial_gui_loaded:
+                    self.gui_manager.load_gui2()
+                    self._initial_gui_loaded = True
                 # Ha nem GUI1 volt aktív (pl. auto-connect), csak frissítsük az állapotot
                 self.update_connection_status_gui("connected")
-                # Itt lehetne jelezni a tálcán, ha auto-connect volt sikeres
-                if self._is_auto_starting:
-                    if hasattr(self, 'tray_icon') and self.tray_icon:
-                         self.tray_icon.showMessage(
-                            "LEDApp Csatlakozva",
-                            f"Sikeresen csatlakozva: {self.selected_device[0] if self.selected_device else 'Ismeretlen eszköz'}",
-                            QSystemTrayIcon.MessageIcon.Information,
-                            3000
-                         )
-                    # Ha az automatikus indítás után sikeres a kapcsolat ÉS a GUI még nem töltődött be,
-                    # akkor most kellene betölteni a GUI2-t (ha láthatóvá tesszük az ablakot)
-                    # De ezt majd a show_window_from_tray kezeli.
+
+            # Automatikus indításkor nem jelenítjük meg az ablakot és nem küldünk értesítést
+            # A GUI marad a háttérben betöltve, hogy később azonnal megjelenhessen
 
         else: # Ha a csatlakozás sikertelen
             self.connected = False
@@ -283,20 +278,17 @@ class LEDApp_BaseWindow(QMainWindow):
             if isinstance(current_widget, GUI1_Widget):
                  current_widget.on_connect_finally() # GUI1 gombjainak visszaállítása
             else:
-                 # Ha nem GUI1 aktív (pl. auto-connect hiba), frissítsük az állapotot
-                 self.update_connection_status_gui("disconnected")
-                 # Itt is jelezhetünk a tálcán
-                 if self._is_auto_starting:
-                    if hasattr(self, 'tray_icon') and self.tray_icon:
-                        self.tray_icon.showMessage(
-                            "LEDApp Hiba",
-                            "Automatikus csatlakozás sikertelen.",
-                            QSystemTrayIcon.MessageIcon.Warning,
-                            3000
-                        )
-                    # Ha az automatikus indítás után sikertelen a kapcsolat ÉS a GUI még nem töltődött be,
-                    # akkor most kellene betölteni a GUI1-et (ha láthatóvá tesszük az ablakot)
-                    # Ezt is a show_window_from_tray kezeli.
+                # Ha nem GUI1 aktív (pl. auto-connect hiba), frissítsük az állapotot
+                self.update_connection_status_gui("disconnected")
+                # Automatikus indításkor, ha sikertelen a csatlakozás és nincs GUI betöltve,
+                # a GUI1-et kell megjeleníteni
+                if self._is_auto_starting:
+                    if not self._initial_gui_loaded:
+                        self.gui_manager.load_gui1()
+                        self._initial_gui_loaded = True
+                        self.show()
+                        self.raise_()
+                        self.activateWindow()
 
 
     @Slot(str)
@@ -314,15 +306,15 @@ class LEDApp_BaseWindow(QMainWindow):
             self.update_connection_status_gui("disconnected")
             if hasattr(self, 'statusBar') and callable(self.statusBar):
                  self.statusBar().showMessage(f"Kapcsolódási hiba: {error_message}", 5000)
-            # Tálca üzenet auto-start esetén
+            # Automatikus indítás esetén, ha sikertelen a csatlakozás és még nincs GUI betöltve,
+            # töltsük be a GUI1-et és jelenítsük meg az ablakot
             if self._is_auto_starting:
-                 if hasattr(self, 'tray_icon') and self.tray_icon:
-                      self.tray_icon.showMessage(
-                          "LEDApp Hiba",
-                          f"Automatikus csatlakozás sikertelen: {error_message.split(':')[0]}", # Rövidebb üzenet
-                          QSystemTrayIcon.MessageIcon.Warning,
-                          5000
-                      )
+                 if not self._initial_gui_loaded:
+                      self.gui_manager.load_gui1()
+                      self._initial_gui_loaded = True
+                      self.show()
+                      self.raise_()
+                      self.activateWindow()
 
     @Slot(str)
     def _handle_command_error(self, error_message):
