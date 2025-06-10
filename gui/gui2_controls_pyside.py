@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QLabel,
     QSlider,
+    QColorDialog,
 )
 from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QFont, QPalette, QColor
@@ -62,6 +63,16 @@ class GUI2_ControlsWidget(QWidget):
             """)
             btn.clicked.connect(lambda checked=False, h=hex_code: self.send_color_command(h))
             color_grid_layout.addWidget(btn, row, col)
+
+        # Egyedi színválasztó gomb a színgombok alatt
+        custom_color_btn = QPushButton("Egyedi szín...")
+        custom_color_btn.setFont(QFont("Arial", 12))
+        custom_color_btn.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        custom_color_btn.setMinimumSize(100, 40)
+        custom_color_btn.clicked.connect(self.pick_custom_color)
+
+        total_rows = (len(COLORS) + colors_per_row - 1) // colors_per_row
+        color_grid_layout.addWidget(custom_color_btn, total_rows, 0, 1, colors_per_row, Qt.AlignmentFlag.AlignHCenter)
         main_layout.addWidget(color_grid_widget)
 
         # --- Ki/Bekapcsoló Gombok ---
@@ -122,6 +133,13 @@ class GUI2_ControlsWidget(QWidget):
              return f"#{r:02x}{g:02x}{b:02x}"
         except Exception:
              return hex_color
+
+    def pick_custom_color(self):
+        """Megnyit egy színválasztó párbeszédablakot és elküldi a kiválasztott színt."""
+        color = QColorDialog.getColor(parent=self)
+        if color.isValid():
+            hex_code = f"7e000503{color.red():02x}{color.green():02x}{color.blue():02x}00ef"
+            self.send_color_command(hex_code)
 
     def send_color_command(self, hex_code):
         """Elküldi a színváltás parancsot."""
