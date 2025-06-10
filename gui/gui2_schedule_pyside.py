@@ -140,7 +140,8 @@ class GUI2_Widget(QWidget):
         if not hasattr(self.main_app, 'profiles') or not self.main_app.profiles:
             self.main_app.profiles = {"Alap": {"active": True, "schedule": logic.get_default_schedule()}}
 
-        self.current_profile_name = list(self.main_app.profiles.keys())[0]
+        self.default_profile_name = list(self.main_app.profiles.keys())[0]
+        self.current_profile_name = self.default_profile_name
         self.main_app.schedule = self.main_app.profiles[self.current_profile_name]["schedule"]
         self.unsaved_changes = False
 
@@ -167,6 +168,11 @@ class GUI2_Widget(QWidget):
         add_profile_btn.setFixedWidth(40)
         add_profile_btn.clicked.connect(self.add_profile)
         profile_container.addWidget(add_profile_btn, 0, Qt.AlignmentFlag.AlignLeft)
+
+        delete_profile_btn = QPushButton("Profil törlése")
+        delete_profile_btn.setFixedWidth(40)
+        delete_profile_btn.clicked.connect(self.delete_profile)
+        profile_container.addWidget(delete_profile_btn, 0, Qt.AlignmentFlag.AlignLeft)
         main_layout.addLayout(profile_container)
 
         # --- Ütemező Táblázat (GroupBox nélkül) ---
@@ -352,6 +358,30 @@ class GUI2_Widget(QWidget):
         self.profile_combo.addItem(name)
         self.profile_combo.setCurrentText(name)
         logic._save_profiles_to_file(self.main_app)
+
+    @Slot()
+    def delete_profile(self):
+        """Törli a kiválasztott profilt, ha nem az alapértelmezett."""
+        if self.current_profile_name == getattr(self, "default_profile_name", ""):
+            QMessageBox.information(self, "Hiba", "Az alapértelmezett profil nem törölhető.")
+            return
+        reply = QMessageBox.question(
+            self,
+            "Profil törlése",
+            f"Biztosan törlöd a(z) '{self.current_profile_name}' profilt?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        del self.main_app.profiles[self.current_profile_name]
+        idx = self.profile_combo.currentIndex()
+        self.profile_combo.removeItem(idx)
+        logic._save_profiles_to_file(self.main_app)
+        self.unsaved_changes = False
+        new_name = self.profile_combo.currentText()
+        if new_name:
+            self.change_profile(new_name)
 
     @Slot(int)
     def toggle_profile_active(self, state):
