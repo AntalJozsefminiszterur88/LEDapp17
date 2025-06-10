@@ -42,15 +42,15 @@ class LEDApp_PySide(LEDApp_BaseWindow):
                 app_icon = QIcon(icon_path)
                 log_event(f"Alkalmazás ikont '{icon_path}'-ból töltöttük be.")
             elif getattr(sys, 'frozen', False):
-                 base_path = os.path.dirname(sys.executable)
-                 frozen_icon_path = os.path.join(base_path, icon_path)
-                 if os.path.exists(frozen_icon_path):
-                     app_icon = QIcon(frozen_icon_path)
-                     log_event(f"Alkalmazás ikont a fagyasztott helyről '{frozen_icon_path}'-ból töltöttük be.")
-                 else:
-                      log_event(f"Figyelmeztetés: Az ikonfájl ('{icon_path}') nem található sem relatívan, sem a fagyasztott helyen.")
+                base_path = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+                frozen_icon_path = os.path.join(base_path, icon_path)
+                if os.path.exists(frozen_icon_path):
+                    app_icon = QIcon(frozen_icon_path)
+                    log_event(f"Alkalmazás ikont a fagyasztott helyről '{frozen_icon_path}'-ból töltöttük be.")
+                else:
+                    log_event(f"Figyelmeztetés: Az ikonfájl ('{icon_path}') nem található sem relatívan, sem a fagyasztott helyen.")
             else:
-                 log_event(f"Figyelmeztetés: Az ikonfájl ('{icon_path}') nem található.")
+                log_event(f"Figyelmeztetés: Az ikonfájl ('{icon_path}') nem található.")
 
 
         if not app_icon.isNull():
