@@ -12,11 +12,14 @@ from PySide6.QtWidgets import (
     QLabel,
     QSlider,
     QColorDialog,
+    QMenu,
+    QAction,
+    QInputDialog,
 )
 from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QFont, QPalette, QColor
 
-from config import COLORS  # Importáljuk a színeket
+from config import COLORS, CUSTOM_COLORS, add_custom_color, remove_custom_color
 import core.config_manager as config_manager
 
 # Logolás importálása, ha kell
@@ -64,15 +67,15 @@ class GUI2_ControlsWidget(QWidget):
             btn.clicked.connect(lambda checked=False, h=hex_code: self.send_color_command(h))
             color_grid_layout.addWidget(btn, row, col)
 
-        # Egyedi színválasztó gomb a színgombok alatt
-        custom_color_btn = QPushButton("Egyedi szín...")
-        custom_color_btn.setFont(QFont("Arial", 12))
-        custom_color_btn.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-        custom_color_btn.setMinimumSize(100, 40)
-        custom_color_btn.clicked.connect(self.pick_custom_color)
+        # Egyedi színek menü gomb
+        self.custom_color_btn = QPushButton("Egyedi színek...")
+        self.custom_color_btn.setFont(QFont("Arial", 12))
+        self.custom_color_btn.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        self.custom_color_btn.setMinimumSize(100, 40)
+        self.custom_color_btn.clicked.connect(self.open_custom_color_menu)
 
         total_rows = (len(COLORS) + colors_per_row - 1) // colors_per_row
-        color_grid_layout.addWidget(custom_color_btn, total_rows, 0, 1, colors_per_row, Qt.AlignmentFlag.AlignHCenter)
+        color_grid_layout.addWidget(self.custom_color_btn, total_rows, 0, 1, colors_per_row, Qt.AlignmentFlag.AlignHCenter)
         main_layout.addWidget(color_grid_widget)
 
         # --- Ki/Bekapcsoló Gombok ---
@@ -134,12 +137,47 @@ class GUI2_ControlsWidget(QWidget):
         except Exception:
              return hex_color
 
+    def open_custom_color_menu(self):
+        """Egyedi színek kezelése menüben."""
+        menu = QMenu(self)
+        add_action = QAction("Új egyedi szín...", self)
+        add_action.triggered.connect(self.pick_custom_color)
+        menu.addAction(add_action)
+        if CUSTOM_COLORS:
+            menu.addSeparator()
+        for name, tk_color, hex_code in CUSTOM_COLORS:
+            sub = QMenu(name, self)
+            choose_act = QAction("Kiválasztás", self)
+            choose_act.triggered.connect(lambda chk=False, h=hex_code: self.send_color_command(h))
+            del_act = QAction("Törlés", self)
+            del_act.triggered.connect(lambda chk=False, n=name: self.delete_custom_color(n))
+            sub.addAction(choose_act)
+            sub.addAction(del_act)
+            menu.addMenu(sub)
+        menu.exec(self.custom_color_btn.mapToGlobal(self.custom_color_btn.rect().bottomLeft()))
+
+    def delete_custom_color(self, name):
+        if remove_custom_color(name):
+            try:
+                self.main_app.gui_manager.load_gui2()
+            except Exception as e:
+                log_event(f"Hiba a GUI frissítésekor: {e}")
+
     def pick_custom_color(self):
-        """Megnyit egy színválasztó párbeszédablakot és elküldi a kiválasztott színt."""
+        """Új egyedi szín felvétele."""
         color = QColorDialog.getColor(parent=self)
-        if color.isValid():
-            hex_code = f"7e000503{color.red():02x}{color.green():02x}{color.blue():02x}00ef"
-            self.send_color_command(hex_code)
+        if not color.isValid():
+            return
+        name, ok = QInputDialog.getText(self, "Szín neve", "Add meg a szín nevét:")
+        if ok and name:
+            entry = add_custom_color(name, color.name())
+            if entry:
+                self.send_color_command(entry[2])
+                # Ütemező frissítése
+                try:
+                    self.main_app.gui_manager.load_gui2()
+                except Exception as e:
+                    log_event(f"Hiba a GUI frissítésekor: {e}")
 
     def send_color_command(self, hex_code):
         """Elküldi a színváltás parancsot."""
