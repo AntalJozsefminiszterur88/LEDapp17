@@ -64,16 +64,10 @@ class GUI2_ControlsWidget(QWidget):
             btn.clicked.connect(lambda checked=False, h=hex_code: self.send_color_command(h))
             color_grid_layout.addWidget(btn, row, col)
 
-        # Egyedi színválasztó gomb a színgombok alatt
-        custom_color_btn = QPushButton("Egyedi szín...")
-        custom_color_btn.setFont(QFont("Arial", 12))
-        custom_color_btn.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-        custom_color_btn.setMinimumSize(100, 40)
-        custom_color_btn.clicked.connect(self.pick_custom_color)
-
+        # Egyedi színválasztó gomb a színgombok alatt (eltávolítva, a GUI2-ben kerül elhelyezésre)
         total_rows = (len(COLORS) + colors_per_row - 1) // colors_per_row
-        color_grid_layout.addWidget(custom_color_btn, total_rows, 0, 1, colors_per_row, Qt.AlignmentFlag.AlignHCenter)
-        main_layout.addWidget(color_grid_widget)
+        color_grid_layout.setRowStretch(total_rows, 0)
+        main_layout.addWidget(color_grid_widget, 0, Qt.AlignmentFlag.AlignTop)
 
         # --- Ki/Bekapcsoló Gombok ---
         power_frame_widget = QWidget()
@@ -94,7 +88,7 @@ class GUI2_ControlsWidget(QWidget):
         self.power_on_btn.setMinimumSize(100, 40)
         self.power_on_btn.clicked.connect(self.turn_on_led)
         power_layout.addWidget(self.power_on_btn)
-        main_layout.addWidget(power_frame_widget)
+        main_layout.addWidget(power_frame_widget, 0, Qt.AlignmentFlag.AlignTop)
 
         # --- Fényerő Csúszka ---
         brightness_widget = QWidget()
@@ -112,7 +106,7 @@ class GUI2_ControlsWidget(QWidget):
         self.brightness_slider.valueChanged.connect(self.change_brightness)
         brightness_layout.addWidget(brightness_label)
         brightness_layout.addWidget(self.brightness_slider)
-        main_layout.addWidget(brightness_widget)
+        main_layout.addWidget(brightness_widget, 0, Qt.AlignmentFlag.AlignTop)
 
         self.update_power_buttons()
 
