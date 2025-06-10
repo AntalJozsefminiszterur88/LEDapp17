@@ -7,6 +7,7 @@ import asyncio # Importálva
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QIcon
 from PySide6.QtCore import QTimer, QMetaObject, Qt, Q_ARG
+from PySide6.QtNetwork import QLocalServer, QLocalSocket
 
 # Importáljuk a szükséges modulokat
 try:
@@ -14,10 +15,15 @@ try:
     from core import config_manager
     from core.reconnect_handler import log_event
 except ImportError as e:
-     def log_event(msg): print(f"[LOG - Dummy Main]: {msg}")
-     log_event(f"Kritikus hiba az importálás során a main.py-ban: {e}")
-     print(f"CRITICAL IMPORT ERROR in main.py: {e}", file=sys.stderr)
-     sys.exit(1)
+    def log_event(msg):
+        print(f"[LOG - Dummy Main]: {msg}")
+    log_event(f"Kritikus hiba az importálás során a main.py-ban: {e}")
+    print(f"CRITICAL IMPORT ERROR in main.py: {e}", file=sys.stderr)
+    sys.exit(1)
+
+# Egyetlen példány azonosítója
+SINGLE_INSTANCE_KEY = "LEDAppSingleton"
+
 
 
 async def attempt_auto_connect(app_instance):
@@ -93,6 +99,22 @@ if __name__ == "__main__":
     # --- Qt Alkalmazás Inicializálása ---
     qt_app = QApplication(sys.argv)
 
+    # --- Egyetlen példány ellenőrzése ---
+    _instance_server = QLocalServer()
+    _instance_socket = QLocalSocket()
+    _instance_socket.connectToServer(SINGLE_INSTANCE_KEY)
+    if _instance_socket.waitForConnected(100):
+        _instance_socket.write(b"activate")
+        _instance_socket.flush()
+        _instance_socket.waitForBytesWritten(100)
+        _instance_socket.disconnectFromServer()
+        sys.exit(0)
+    else:
+        _instance_socket.abort()
+        if not _instance_server.listen(SINGLE_INSTANCE_KEY):
+            QLocalServer.removeServer(SINGLE_INSTANCE_KEY)
+            _instance_server.listen(SINGLE_INSTANCE_KEY)
+
     # --- Ikon Beállítása ---
     # ... (ikon betöltési logika változatlan) ...
     icon_path = "led_icon.ico"
@@ -120,6 +142,25 @@ if __name__ == "__main__":
     start_hidden_arg = args.tray
     main_window = LEDApp_PySide(start_hidden=start_hidden_arg)
     main_window._is_auto_starting = start_hidden_arg
+
+    def _bring_existing_to_front():
+        if main_window.isHidden():
+            main_window.show_window_from_tray()
+        else:
+            main_window.showNormal()
+            main_window.raise_()
+            main_window.activateWindow()
+
+    # új példány értesítések kezelése
+    def _handle_new_connection():
+        conn = _instance_server.nextPendingConnection()
+        if conn:
+            conn.waitForReadyRead(100)
+            conn.readAll()
+            conn.disconnectFromServer()
+            _bring_existing_to_front()
+
+    _instance_server.newConnection.connect(_handle_new_connection)
 
     if not app_icon.isNull():
          main_window.setWindowIcon(app_icon)
