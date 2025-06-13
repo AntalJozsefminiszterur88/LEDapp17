@@ -27,6 +27,15 @@ Launch the program by executing `python main.py` from the repository root. On Wi
 python main.py
 ```
 
+## Testing
+
+Install test dependencies and run the unit tests with `pytest`:
+
+```bash
+pip install -r requirements.txt
+pytest
+```
+
 ## License
 
 This project is released under the terms of the MIT License. See [`LICENSE`](LICENSE) for full details.

@@ -4,3 +4,4 @@ bleak
 requests
 suntime
 pytz
+pytest
