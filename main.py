@@ -1,4 +1,8 @@
-# LEDapp/main.py (Javítva a Future await hiba és opcionális késleltetés)
+"""Entry point for the LED application.
+
+This module sets up the Qt application, handles single instance logic and
+provides the ``attempt_auto_connect`` coroutine used during startup.
+"""
 
 import sys
 import os
@@ -6,7 +10,7 @@ import argparse
 import asyncio # Importálva
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QIcon
-from PySide6.QtCore import QTimer, QMetaObject, Qt, Q_ARG
+from PySide6.QtCore import QMetaObject, Qt, Q_ARG
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 
 # Importáljuk a szükséges modulokat
@@ -16,6 +20,7 @@ try:
     from core.reconnect_handler import log_event
 except ImportError as e:
     def log_event(msg):
+        """Fallback logger if imports fail."""
         print(f"[LOG - Dummy Main]: {msg}")
     log_event(f"Kritikus hiba az importálás során a main.py-ban: {e}")
     print(f"CRITICAL IMPORT ERROR in main.py: {e}", file=sys.stderr)
@@ -28,8 +33,11 @@ SINGLE_INSTANCE_KEY = "LEDAppSingleton"
 
 async def attempt_auto_connect(app_instance):
     """ Megkísérli az automatikus csatlakozást a háttérben. """
-    if not app_instance: return False
-    connected_successfully = False # Kezdeti érték
+    if not app_instance:
+        return False
+
+    # A visszatérési érték jelenleg nem használatos, de a jövőben
+    # meghatározhatjuk a kapcsolat sikerességét is.
 
     try:
         # *** Opcionális extra késleltetés az újraindítás után ***
@@ -46,7 +54,12 @@ async def attempt_auto_connect(app_instance):
 
         log_event(f"Automatikus csatlakozás megkísérlése: {last_name} ({last_addr})")
         app_instance.selected_device = (last_name, last_addr)
-        QMetaObject.invokeMethod(app_instance, "update_connection_status_gui", Qt.ConnectionType.QueuedConnection, Q_ARG(str, "connecting"))
+        QMetaObject.invokeMethod(
+            app_instance,
+            "update_connection_status_gui",
+            Qt.ConnectionType.QueuedConnection,
+            Q_ARG(str, "connecting"),
+        )
 
         # Csatlakozási kísérlet indítása az AsyncHelper segítségével
         # Az eredményt a done_callback fogja kezelni és a signalokat kibocsátani
@@ -62,28 +75,37 @@ async def attempt_auto_connect(app_instance):
         # A future objektummal itt nem csinálunk semmit.
 
         if not future:
-             log_event("Hiba: Nem sikerült elindítani az automatikus csatlakozási taskot.")
-             connected_successfully = False
-        # A connected_successfully értékét a signal handler (_handle_connect_results) fogja beállítani.
-        # Itt nem tudjuk megvárni szinkron módon. A függvény visszatérhet,
-        # mielőtt a kapcsolat ténylegesen létrejönne vagy meghiúsulna.
+            log_event(
+                "Hiba: Nem sikerült elindítani az automatikus csatlakozási"
+                " taskot."
+            )
+        # A kapcsolat sikerességét a signal handler (_handle_connect_results)
+        # fogja beállítani, ezért itt nem tudjuk szinkron módon megvárni az
+        # eredményt.
         # A _initial_connection_attempted flag beállítása a finally blokkban történik.
 
     except Exception as e:
-         # Ez a blokk valószínűleg nem fog lefutni a wait_for eltávolítása miatt,
-         # de biztonság kedvéért itt hagyjuk.
-         log_event(f"Váratlan hiba az attempt_auto_connect indításakor: {e}")
-         connected_successfully = False
-         # Hibajelzés küldése a fő szálra
-         if hasattr(app_instance, '_handle_connect_error'):
-             error_msg = f"Indítási hiba: {e}"
-             QMetaObject.invokeMethod(app_instance, "_handle_connect_error", Qt.ConnectionType.QueuedConnection, Q_ARG(str, error_msg))
+        # Ez a blokk valószínűleg nem fog lefutni a wait_for eltávolítása miatt,
+        # de biztonság kedvéért itt hagyjuk.
+        log_event(f"Váratlan hiba az attempt_auto_connect indításakor: {e}")
+        # Hibajelzés küldése a fő szálra
+        if hasattr(app_instance, '_handle_connect_error'):
+            error_msg = f"Indítási hiba: {e}"
+            QMetaObject.invokeMethod(
+                app_instance,
+                "_handle_connect_error",
+                Qt.ConnectionType.QueuedConnection,
+                Q_ARG(str, error_msg),
+            )
 
     finally:
-         app_instance._initial_connection_attempted = True
-         # A connected_successfully itt már nem releváns, mert a háttérben dől el.
-         log_event(f"_initial_connection_attempted flag beállítva: True (Csatlakozás a háttérben fut/futott).")
-         # Az ablak betöltését a show_window_from_tray vagy a _handle_connect_results intézi.
+        app_instance._initial_connection_attempted = True
+        # A sikeresség itt már nem releváns, mert a háttérben dől el.
+        log_event(
+            "_initial_connection_attempted flag beállítva: True (Csatlakozás a"
+            " háttérben fut/futott)."
+        )
+        # Az ablak betöltését a show_window_from_tray vagy a _handle_connect_results intézi.
 
     # A függvény visszatérési értéke itt már nem tükrözi a kapcsolat sikerességét,
     # mivel az aszinkron módon dől el.
@@ -117,19 +139,22 @@ if __name__ == "__main__":
 
     # --- Ikon Beállítása ---
     # ... (ikon betöltési logika változatlan) ...
-    icon_path = "led_icon.ico"
+    ICON_PATH = "led_icon.ico"
     app_icon = QIcon()
-    if os.path.exists(icon_path):
-        app_icon = QIcon(icon_path)
+    if os.path.exists(ICON_PATH):
+        app_icon = QIcon(ICON_PATH)
     elif getattr(sys, 'frozen', False):
         base_path = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
-        frozen_icon_path = os.path.join(base_path, icon_path)
+        frozen_icon_path = os.path.join(base_path, ICON_PATH)
         if os.path.exists(frozen_icon_path):
             app_icon = QIcon(frozen_icon_path)
         else:
-            print(f"Figyelmeztetés: Az ikonfájl nem található a fagyasztott helyen sem: {frozen_icon_path}")
+            print(
+                f"Figyelmeztetés: Az ikonfájl nem található a fagyasztott helyen sem:"
+                f" {frozen_icon_path}"
+            )
     else:
-        print(f"Figyelmeztetés: Az ikonfájl nem található: {icon_path}")
+        print(f"Figyelmeztetés: Az ikonfájl nem található: {ICON_PATH}")
 
     if not app_icon.isNull():
         qt_app.setWindowIcon(app_icon)
@@ -163,7 +188,7 @@ if __name__ == "__main__":
     _instance_server.newConnection.connect(_handle_new_connection)
 
     if not app_icon.isNull():
-         main_window.setWindowIcon(app_icon)
+        main_window.setWindowIcon(app_icon)
 
     # --- Automatikus csatlakozás és indítási logika ---
     if start_hidden_arg:
@@ -171,18 +196,25 @@ if __name__ == "__main__":
 
         if config_manager.get_setting("auto_connect_on_startup"):
             async def delayed_autoconnect():
-                 await asyncio.sleep(0.5) # Rövid várakozás az eseményhurok stabilizálódására
-                 await attempt_auto_connect(main_window) # Elindítja a csatlakozást
+                """Indít egy rövid késleltetés után automatikus csatlakozást."""
+                # Rövid várakozás az eseményhurok stabilizálódására
+                await asyncio.sleep(0.5)
+                # Elindítja a csatlakozást
+                await attempt_auto_connect(main_window)
 
             # Az asyncio task futtatása az AsyncHelperen keresztül
             main_window.async_helper.run_async_task(delayed_autoconnect())
         else:
-            log_event("Automatikus csatlakozás kihagyva (beállítás szerint le van tiltva).")
-            main_window._initial_connection_attempted = True # Jelöljük, hogy nem kell várni
+            log_event(
+                "Automatikus csatlakozás kihagyva (beállítás szerint le van tiltva)."
+            )
+            # Jelöljük, hogy nem kell várni
+            main_window._initial_connection_attempted = True
 
     else:
         log_event("Normál indítás.")
-        main_window._initial_connection_attempted = True # Normál indításnál nincs auto-connect kísérlet
+        # Normál indításnál nincs auto-connect kísérlet
+        main_window._initial_connection_attempted = True
         main_window.show()
 
 
