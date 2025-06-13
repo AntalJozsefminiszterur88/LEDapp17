@@ -1,5 +1,15 @@
 from pathlib import Path
 
+# Logolás (ha elérhető)
+try:
+    from core.reconnect_handler import log_event
+except ImportError:
+    try:
+        from .core.reconnect_handler import log_event
+    except Exception:
+        def log_event(msg):
+            print(f"[LOG - Dummy Config]: {msg}")
+
 LATITUDE = 47.4338
 LONGITUDE = 19.1931
 TIMEZONE = "UTC+2"
@@ -44,7 +54,8 @@ def _load_custom_colors():
                     cmd = f"7e000503{hex_val}00ef"
                     colors.append((item["name"], f"#{hex_val}", cmd))
             return colors
-        except Exception:
+        except Exception as e:
+            log_event(f"Hiba a saját színek betöltésekor ({CUSTOM_COLORS_FILE}): {e}")
             return []
     return []
 
