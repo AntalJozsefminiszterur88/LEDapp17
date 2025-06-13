@@ -259,67 +259,90 @@ def save_profile(gui_widget):
 def check_profiles(gui_widget):
     """Aktív ütemezési profilok ellenőrzése és LED vezérlése."""
     now_local = datetime.now(LOCAL_TZ)
+    today_date = now_local.date()
     today_name_hu = DAYS_HU.get(now_local.strftime('%A'), now_local.strftime('%A'))
+
+    # Előző nap neve (magyarul) a keresztbe nyúló intervallumok kezeléséhez
+    yesterday = now_local - timedelta(days=1)
+    yesterday_name_hu = DAYS_HU.get(yesterday.strftime('%A'), yesterday.strftime('%A'))
 
     main_app = gui_widget.main_app
     desired_hex = None
     schedule_entries_found = False
+
+    def parse_day_entry(day_data, ref_date):
+        """Visszaadja az on/off datetime objektumokat egy adott dátumhoz."""
+        if not day_data:
+            return None, None
+
+        on_time_dt = None
+        off_time_dt = None
+
+        # Napkelte vagy manuális on_time
+        if day_data.get("sunrise"):
+            # Csak a mai napra van napkelte adatunk
+            if ref_date == today_date and main_app.sunrise:
+                try:
+                    offset = int(day_data.get("sunrise_offset", 0))
+                    on_time_dt = main_app.sunrise + timedelta(minutes=offset)
+                except (ValueError, TypeError):
+                    pass
+        else:
+            on_str = day_data.get("on_time")
+            if on_str:
+                try:
+                    time_obj = dt_time.fromisoformat(on_str)
+                    on_time_dt = LOCAL_TZ.localize(datetime.combine(ref_date, time_obj))
+                except ValueError:
+                    pass
+
+        # Napnyugta vagy manuális off_time
+        if day_data.get("sunset"):
+            if ref_date == today_date and main_app.sunset:
+                try:
+                    offset = int(day_data.get("sunset_offset", 0))
+                    off_time_dt = main_app.sunset + timedelta(minutes=offset)
+                except (ValueError, TypeError):
+                    pass
+        else:
+            off_str = day_data.get("off_time")
+            if off_str:
+                try:
+                    time_obj = dt_time.fromisoformat(off_str)
+                    off_time_dt = LOCAL_TZ.localize(datetime.combine(ref_date, time_obj))
+                except ValueError:
+                    pass
+
+        if on_time_dt and off_time_dt and off_time_dt <= on_time_dt:
+            off_time_dt += timedelta(days=1)
+
+        return on_time_dt, off_time_dt
 
     try:
         for name, prof in main_app.profiles.items():
             if not prof.get("active", False):
                 continue
 
-            day_data = prof.get("schedule", {}).get(today_name_hu)
-            if not day_data:
-                continue
+            # Először vizsgáljuk az előző napot, majd a mait
+            for day_name, ref_date in ((yesterday_name_hu, yesterday.date()), (today_name_hu, today_date)):
+                day_data = prof.get("schedule", {}).get(day_name)
+                on_time_dt, off_time_dt = parse_day_entry(day_data, ref_date)
 
-            on_time_dt = None
-            off_time_dt = None
+                if not on_time_dt or not off_time_dt:
+                    continue
 
-            if day_data.get("sunrise"):
-                try:
-                    offset = int(day_data.get("sunrise_offset", 0))
-                    if main_app.sunrise:
-                        on_time_dt = main_app.sunrise + timedelta(minutes=offset)
-                except (ValueError, TypeError):
-                    pass
-            else:
-                on_str = day_data.get("on_time")
-                if on_str:
-                    try:
-                        time_obj = dt_time.fromisoformat(on_str)
-                        on_time_dt = LOCAL_TZ.localize(datetime.combine(now_local.date(), time_obj))
-                    except ValueError:
-                        pass
-
-            if day_data.get("sunset"):
-                try:
-                    offset = int(day_data.get("sunset_offset", 0))
-                    if main_app.sunset:
-                        off_time_dt = main_app.sunset + timedelta(minutes=offset)
-                except (ValueError, TypeError):
-                    pass
-            else:
-                off_str = day_data.get("off_time")
-                if off_str:
-                    try:
-                        time_obj = dt_time.fromisoformat(off_str)
-                        off_time_dt = LOCAL_TZ.localize(datetime.combine(now_local.date(), time_obj))
-                        if on_time_dt and off_time_dt <= on_time_dt:
-                            off_time_dt += timedelta(days=1)
-                    except ValueError:
-                        pass
-
-            if on_time_dt and off_time_dt:
                 schedule_entries_found = True
                 target_color_name = day_data.get("color", "")
                 target_color_hex = next((c[2] for c in COLORS if c[0] == target_color_name), None)
                 if not target_color_hex:
                     continue
+
                 if on_time_dt <= now_local < off_time_dt:
                     desired_hex = target_color_hex
                     break
+
+            if desired_hex:
+                break
 
         if desired_hex:
             if not main_app.is_led_on or main_app.last_color_hex != desired_hex:
