@@ -3,13 +3,24 @@ from typing import List, Dict
 
 from config import CUSTOM_COLORS_FILE, CUSTOM_COLORS, COLORS
 
+# Logolás importálása
+try:
+    from .reconnect_handler import log_event
+except ImportError:
+    try:
+        from core.reconnect_handler import log_event
+    except Exception:
+        def log_event(msg):
+            print(f"[LOG - Dummy CustomColorManager]: {msg}")
+
 
 def save_custom_colors_list():
     try:
         with open(CUSTOM_COLORS_FILE, "w", encoding="utf-8") as f:
             json.dump(CUSTOM_COLORS, f, ensure_ascii=False, indent=4)
-    except Exception:
-        pass
+    except Exception as e:
+        log_event(f"Hiba a színek mentésekor: {e}")
+        raise
 
 
 def add_custom_color(name: str, hex_code: str):

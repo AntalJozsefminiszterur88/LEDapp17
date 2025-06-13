@@ -2,7 +2,6 @@
 
 import os
 import asyncio
-import time
 import traceback
 import sys # Hozzáadva sys import
 

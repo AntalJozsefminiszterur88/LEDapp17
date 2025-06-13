@@ -89,7 +89,8 @@ class GUI2_ControlsWidget(QWidget):
             color = QColor(bg_hex)
             brightness = (color.red() * 299 + color.green() * 587 + color.blue() * 114) / 1000
             return "white" if brightness < 128 else "black"
-        except Exception:
+        except Exception as e:
+            log_event(f"Hiba a kontraszt szín számításakor ({bg_hex}): {e}")
             return "black"
 
     def adjust_color(self, hex_color, amount):
@@ -99,7 +100,8 @@ class GUI2_ControlsWidget(QWidget):
              g = max(0, min(255, color.green() + amount))
              b = max(0, min(255, color.blue() + amount))
              return f"#{r:02x}{g:02x}{b:02x}"
-        except Exception:
+        except Exception as e:
+             log_event(f"Hiba a szín igazításakor ({hex_color}): {e}")
              return hex_color
 
     def build_color_buttons(self):
