@@ -7,8 +7,10 @@ except ImportError:
     try:
         from .core.reconnect_handler import log_event
     except Exception:
+
         def log_event(msg):
             print(f"[LOG - Dummy Config]: {msg}")
+
 
 LATITUDE = 47.4338
 LONGITUDE = 19.1931
@@ -35,7 +37,7 @@ DEFAULT_COLORS = [
     ("Cian", "#00ffff", "7e00050300ffff00ef"),
     ("Lila", "#800080", "7e00050380008000ef"),
     ("Narancs", "#ffa500", "7e000503ffa50000ef"),
-    ("Fehér", "#ffffff", "7e000503ffffff00ef")
+    ("Fehér", "#ffffff", "7e000503ffffff00ef"),
 ]
 
 CUSTOM_COLORS_FILE = str(BASE_DIR / "custom_colors.json")
@@ -45,6 +47,7 @@ def _load_custom_colors():
     if Path(CUSTOM_COLORS_FILE).exists():
         try:
             import json
+
             with open(CUSTOM_COLORS_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
             colors = []

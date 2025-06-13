@@ -1,25 +1,34 @@
 # LEDapp/gui/gui1_pyside.py (Objektumnévvel)
 
-import asyncio
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QListWidget, QProgressBar, QMessageBox, QSizePolicy, QAbstractItemView,
-    QSpacerItem
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QListWidget,
+    QProgressBar,
+    QMessageBox,
+    QSizePolicy,
+    QAbstractItemView,
+    QSpacerItem,
 )
-from PySide6.QtCore import Qt, Slot, Signal
+from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QFont
 
 # Logolás importálása
 try:
     from core.reconnect_handler import log_event
 except ImportError:
-    def log_event(msg): print(f"[LOG - Dummy GUI1]: {msg}")
+
+    def log_event(msg):
+        print(f"[LOG - Dummy GUI1]: {msg}")
 
 
 class GUI1_Widget(QWidget):
     def __init__(self, main_app, parent=None):
         super().__init__(parent)
-        self.setObjectName("GUI1_Widget_Instance") # <<< OBJEKTUMNÉV HOZZÁADVA >>>
+        self.setObjectName("GUI1_Widget_Instance")  # <<< OBJEKTUMNÉV HOZZÁADVA >>>
         self.main_app = main_app
 
         # --- Layout és Widgetek ---
@@ -38,49 +47,68 @@ class GUI1_Widget(QWidget):
 
         # Progress Bar Frame
         progress_frame_layout = QHBoxLayout()
-        progress_widget = QWidget(); progress_widget.setLayout(progress_frame_layout)
-        progress_frame_layout.setContentsMargins(0, 0, 0, 0); progress_frame_layout.setSpacing(5)
-        self.progress_label = QLabel(""); font_small = QFont("Arial", 10); self.progress_label.setFont(font_small)
-        self.progress_label.setStyleSheet("color: gray;"); self.progress_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        progress_widget = QWidget()
+        progress_widget.setLayout(progress_frame_layout)
+        progress_frame_layout.setContentsMargins(0, 0, 0, 0)
+        progress_frame_layout.setSpacing(5)
+        self.progress_label = QLabel("")
+        font_small = QFont("Arial", 10)
+        self.progress_label.setFont(font_small)
+        self.progress_label.setStyleSheet("color: gray;")
+        self.progress_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         progress_frame_layout.addWidget(self.progress_label, 0)
-        self.progress_bar = QProgressBar(); self.progress_bar.setRange(0, 100); self.progress_bar.setValue(0)
-        self.progress_bar.setTextVisible(False); self.progress_bar.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         progress_frame_layout.addWidget(self.progress_bar, 1)
         layout.addWidget(progress_widget)
 
         # Eszközlista
-        self.device_listbox = QListWidget(); font_list = QFont("Arial", 12); self.device_listbox.setFont(font_list)
+        self.device_listbox = QListWidget()
+        font_list = QFont("Arial", 12)
+        self.device_listbox.setFont(font_list)
         self.device_listbox.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.device_listbox.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         layout.addWidget(self.device_listbox)
         self.device_listbox.itemDoubleClicked.connect(self.on_device_double_click)
 
         # Gombok Frame
-        button_frame_layout = QHBoxLayout(); button_widget = QWidget(); button_widget.setLayout(button_frame_layout)
-        button_frame_layout.setContentsMargins(0, 0, 0, 0); button_frame_layout.setSpacing(5)
+        button_frame_layout = QHBoxLayout()
+        button_widget = QWidget()
+        button_widget.setLayout(button_frame_layout)
+        button_frame_layout.setContentsMargins(0, 0, 0, 0)
+        button_frame_layout.setSpacing(5)
         button_frame_layout.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
-        self.search_button = QPushButton("Keresés"); self.search_button.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        self.search_button = QPushButton("Keresés")
+        self.search_button.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         self.search_button.clicked.connect(self.search_devices)
         button_frame_layout.addWidget(self.search_button)
-        self.connect_button = QPushButton("Csatlakozás"); self.connect_button.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        self.connect_button = QPushButton("Csatlakozás")
+        self.connect_button.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         self.connect_button.clicked.connect(self.connect_device)
         button_frame_layout.addWidget(self.connect_button)
-        self.disconnect_button = QPushButton("Kapcsolat bontása"); self.disconnect_button.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        self.disconnect_button = QPushButton("Kapcsolat bontása")
+        self.disconnect_button.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         self.disconnect_button.clicked.connect(self.main_app.disconnect_device)
         button_frame_layout.addWidget(self.disconnect_button)
-        self.goto_gui2_button = QPushButton("→"); self.goto_gui2_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        self.goto_gui2_button.clicked.connect(self.main_app.gui_manager.load_gui2) # GuiManageren keresztül
+        self.goto_gui2_button = QPushButton("→")
+        self.goto_gui2_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.goto_gui2_button.clicked.connect(self.main_app.gui_manager.load_gui2)  # GuiManageren keresztül
         button_frame_layout.addWidget(self.goto_gui2_button)
         button_frame_layout.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
         layout.addWidget(button_widget)
 
         self.update_button_states()
-        if self.main_app.devices: self.update_device_list()
+        if self.main_app.devices:
+            self.update_device_list()
+
     # ... (on_device_double_click, update_device_list, update_button_states változatlan) ...
     @Slot()
     def on_device_double_click(self):
         if self.connect_button.isEnabled() and self.connect_button.isVisible():
-             self.connect_device()
+            self.connect_device()
 
     def update_device_list(self):
         self.device_listbox.clear()
@@ -110,7 +138,7 @@ class GUI1_Widget(QWidget):
         self.main_app.async_helper.run_async_task(
             self.main_app.ble.scan(),
             self.main_app.scan_results_signal,
-            self.main_app.scan_error_signal
+            self.main_app.scan_error_signal,
         )
 
     @Slot(object)
@@ -126,7 +154,8 @@ class GUI1_Widget(QWidget):
 
     @Slot()
     def on_scan_finally(self):
-        self.progress_bar.setRange(0, 100); self.progress_bar.setValue(100)
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(100)
         self.update_button_states()
 
     # ... (connect_device, on_connect_finished, on_connect_error, on_connect_finally változatlan, a run_async_task hívás már a signalokat használja) ...
@@ -134,11 +163,16 @@ class GUI1_Widget(QWidget):
     def connect_device(self):
         selected_items = self.device_listbox.selectedItems()
         if not selected_items:
-            if not self.main_app.devices: QMessageBox.information(self, "Nincs Eszköz", "Először keress eszközöket."); return
-            QMessageBox.warning(self, "Nincs kiválasztva", "Kérlek válassz ki egy eszközt a listából."); return
+            if not self.main_app.devices:
+                QMessageBox.information(self, "Nincs Eszköz", "Először keress eszközöket.")
+                return
+            QMessageBox.warning(self, "Nincs kiválasztva", "Kérlek válassz ki egy eszközt a listából.")
+            return
 
         current_row = self.device_listbox.currentRow()
-        if current_row < 0 or current_row >= len(self.main_app.devices): QMessageBox.critical(self, "Hiba", "Érvénytelen kiválasztás."); return
+        if current_row < 0 or current_row >= len(self.main_app.devices):
+            QMessageBox.critical(self, "Hiba", "Érvénytelen kiválasztás.")
+            return
 
         name, address = self.main_app.devices[current_row]
         self.main_app.selected_device = (name, address)
@@ -150,7 +184,7 @@ class GUI1_Widget(QWidget):
         self.main_app.async_helper.run_async_task(
             self.main_app.ble.connect_with_retry(address),
             self.main_app.connect_results_signal,
-            self.main_app.connect_error_signal
+            self.main_app.connect_error_signal,
         )
 
     @Slot(bool)
@@ -168,7 +202,8 @@ class GUI1_Widget(QWidget):
     @Slot()
     def on_connect_finally(self):
         if not self.main_app.connected:
-             self.progress_bar.setRange(0, 100); self.progress_bar.setValue(100)
-             # A progress labelt hagyjuk, hogy mutassa a hibát vagy az eredményszámot (scan után)
-             # self.progress_label.setText("") # Ezt kivesszük
-             self.update_button_states()
+            self.progress_bar.setRange(0, 100)
+            self.progress_bar.setValue(100)
+            # A progress labelt hagyjuk, hogy mutassa a hibát vagy az eredményszámot (scan után)
+            # self.progress_label.setText("") # Ezt kivesszük
+            self.update_button_states()
