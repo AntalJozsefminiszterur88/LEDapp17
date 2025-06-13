@@ -1,11 +1,17 @@
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QListWidget, QListWidgetItem, QColorDialog, QLineEdit
+    QDialog,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QListWidget,
+    QListWidgetItem,
+    QColorDialog,
+    QLineEdit,
 )
-from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 
-from config import COLORS, CUSTOM_COLORS
+from config import CUSTOM_COLORS
 from core.custom_color_manager import add_custom_color, delete_custom_color
 
 

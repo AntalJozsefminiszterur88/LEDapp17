@@ -7,12 +7,11 @@ import traceback
 import pytz
 
 from PySide6.QtWidgets import QMessageBox
-from PySide6.QtCore import Qt
 
 # Importáljuk a szükséges konfigurációs és backend/core elemeket
 from config import COLORS, DAYS, CONFIG_FILE, PROFILES_FILE
-from core.sun_logic import get_local_sun_info, get_hungarian_day_name, DAYS_HU
-from core.location_utils import get_sun_times # Bár itt nincs közvetlen hívás, a main_app tartalmazza
+from core.sun_logic import DAYS_HU
+from core.location_utils import get_sun_times  # noqa: F401
 
 # --- Időzóna Definíció ---
 # Biztosítjuk, hogy a LOCAL_TZ létezzen
@@ -20,6 +19,7 @@ try:
     # Próbáljuk meg a rendszer alapértelmezett időzónáját használni, ha lehetséges
     try:
         import tzlocal
+
         LOCAL_TZ = tzlocal.get_localzone()
         print(f"Helyi időzóna (tzlocal - logic): {LOCAL_TZ.zone}")
     except ImportError:
@@ -34,6 +34,7 @@ except Exception as e:
     LOCAL_TZ = pytz.utc
 
 # --- Logika Függvények ---
+
 
 def get_default_schedule():
     """Alapértelmezett ütemezés létrehozása."""
@@ -54,7 +55,6 @@ def get_default_schedule():
 def load_profiles_from_file(main_app):
     """Betölti az ütemezési profilokat."""
     default_schedule = get_default_schedule()
-    default_profiles = {"Alapértelmezett": {"active": True, "schedule": default_schedule}}
 
     if os.path.exists(PROFILES_FILE):
         try:
@@ -215,19 +215,27 @@ def save_profile(gui_widget):
                     dt_time.fromisoformat(on_time_val)
                     temp_data["on_time"] = on_time_val
                 except ValueError:
-                     raise ValueError(f"Érvénytelen bekapcsolási idő formátum: '{on_time_val}'. HH:MM formátum szükséges.")
+                    raise ValueError(
+                        f"Érvénytelen bekapcsolási idő formátum: '{on_time_val}'. HH:MM formátum szükséges."
+                    )
 
             if not temp_data["sunset"] and off_time_val:
-                 try:
-                     dt_time.fromisoformat(off_time_val)
-                     temp_data["off_time"] = off_time_val
-                 except ValueError:
-                     raise ValueError(f"Érvénytelen kikapcsolási idő formátum: '{off_time_val}'. HH:MM formátum szükséges.")
+                try:
+                    dt_time.fromisoformat(off_time_val)
+                    temp_data["off_time"] = off_time_val
+                except ValueError:
+                    raise ValueError(
+                        f"Érvénytelen kikapcsolási idő formátum: '{off_time_val}'. HH:MM formátum szükséges."
+                    )
 
             schedule_to_save[day] = temp_data
 
         except ValueError as ve:
-            QMessageBox.critical(gui_widget, "Hiba", f"Érvénytelen érték a '{day}' napnál: {ve}. Kérlek javítsd (idő HH:MM, offset egész szám).")
+            QMessageBox.critical(
+                gui_widget,
+                "Hiba",
+                f"Érvénytelen érték a '{day}' napnál: {ve}. Kérlek javítsd (idő HH:MM, offset egész szám).",
+            )
             valid = False
             break
         except Exception as e:
@@ -255,16 +263,15 @@ def save_profile(gui_widget):
         QMessageBox.critical(gui_widget, "Mentési hiba", f"Hiba történt a mentés során: {e}")
 
 
-
 def check_profiles(gui_widget):
     """Aktív ütemezési profilok ellenőrzése és LED vezérlése."""
     now_local = datetime.now(LOCAL_TZ)
     today_date = now_local.date()
-    today_name_hu = DAYS_HU.get(now_local.strftime('%A'), now_local.strftime('%A'))
+    today_name_hu = DAYS_HU.get(now_local.strftime("%A"), now_local.strftime("%A"))
 
     # Előző nap neve (magyarul) a keresztbe nyúló intervallumok kezeléséhez
     yesterday = now_local - timedelta(days=1)
-    yesterday_name_hu = DAYS_HU.get(yesterday.strftime('%A'), yesterday.strftime('%A'))
+    yesterday_name_hu = DAYS_HU.get(yesterday.strftime("%A"), yesterday.strftime("%A"))
 
     main_app = gui_widget.main_app
     desired_hex = None
@@ -324,7 +331,10 @@ def check_profiles(gui_widget):
                 continue
 
             # Először vizsgáljuk az előző napot, majd a mait
-            for day_name, ref_date in ((yesterday_name_hu, yesterday.date()), (today_name_hu, today_date)):
+            for day_name, ref_date in (
+                (yesterday_name_hu, yesterday.date()),
+                (today_name_hu, today_date),
+            ):
                 day_data = prof.get("schedule", {}).get(day_name)
                 on_time_dt, off_time_dt = parse_day_entry(day_data, ref_date)
 

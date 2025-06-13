@@ -5,3 +5,5 @@ requests
 suntime
 pytz
 pytest
+flake8
+black

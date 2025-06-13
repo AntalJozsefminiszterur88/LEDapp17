@@ -11,6 +11,7 @@ except ImportError:
     try:
         from core.reconnect_handler import log_event
     except Exception:
+
         def log_event(msg):
             """Fallback logger if imports fail."""
             print(f"[LOG - Dummy CustomColorManager]: {msg}")
@@ -28,7 +29,7 @@ def save_custom_colors_list():
 
 def add_custom_color(name: str, hex_code: str):
     """Add a new custom color and persist it."""
-    hex_code = hex_code.lstrip('#')
+    hex_code = hex_code.lstrip("#")
     entry = {"name": name, "hex": f"#{hex_code}"}
     CUSTOM_COLORS.append(entry)
     COLORS.append((name, f"#{hex_code}", f"7e000503{hex_code}00ef"))
