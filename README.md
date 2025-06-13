@@ -2,6 +2,8 @@
 
 LEDApp is a graphical utility for scheduling and controlling a Bluetooth LED light. It discovers the bulb using Bleak and lets you set colors and timers through a PySide6 interface. The configuration files are stored in your user profile so the app can remember the last connected device and the lighting schedule.
 
+The files `led_settings.json`, `led_schedule.json`, and `led_schedule_profiles.json` are generated automatically at runtime. They live in your user profile directory and should **not** be committed to version control.
+
 ## Requirements
 
 - Python 3.11 or newer

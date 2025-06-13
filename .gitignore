@@ -24,3 +24,8 @@ LEDApp.exe
 # Logs
 *.log
 led_connection_log.txt
+
+# Local configuration
+led_settings.json
+led_schedule.json
+led_schedule_profiles.json
