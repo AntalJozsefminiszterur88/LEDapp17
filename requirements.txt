@@ -1,0 +1,6 @@
+# Szükséges Python csomagok
+PySide6
+bleak
+requests
+suntime
+pytz
