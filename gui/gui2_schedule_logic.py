@@ -276,6 +276,7 @@ def check_profiles(gui_widget):
     main_app = gui_widget.main_app
     desired_hex = None
     schedule_entries_found = False
+    intervals = []
 
     def parse_day_entry(day_data, ref_date):
         """Visszaadja az on/off datetime objektumokat egy adott dátumhoz."""
@@ -347,12 +348,22 @@ def check_profiles(gui_widget):
                 if not target_color_hex:
                     continue
 
-                if on_time_dt <= now_local < off_time_dt:
-                    desired_hex = target_color_hex
-                    break
+                intervals.append((on_time_dt, off_time_dt, target_color_hex))
 
-            if desired_hex:
-                break
+
+        if intervals:
+            intervals.sort(key=lambda x: x[0])
+            first_start = intervals[0][0]
+            last_end = max(i[1] for i in intervals)
+            cycle_duration = last_end - first_start
+            if cycle_duration.total_seconds() <= 0:
+                cycle_duration = timedelta(days=1)
+            rel_now = (now_local - first_start) % cycle_duration
+            point_time = first_start + rel_now
+            for start, end, hex_color in intervals:
+                if start <= point_time < end:
+                    desired_hex = hex_color
+                    break
 
         if desired_hex:
             if not main_app.is_led_on or main_app.last_color_hex != desired_hex:
