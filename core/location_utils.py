@@ -20,35 +20,45 @@ LOCAL_TZ = pytz_timezone("Europe/Budapest")  # Feltételezzük, hogy ez létezik
 UTC_TZ = pytz_timezone("UTC")
 
 
+def _fetch_coords_ipapi():
+    """Lekérdezi a koordinátákat az ip-api.com szolgáltatásból."""
+    headers = {"User-Agent": "LEDApp/1.0"}
+    response = requests.get("http://ip-api.com/json/", timeout=5, headers=headers)
+    response.raise_for_status()
+    data = response.json()
+    if data.get("status") != "success":
+        raise RuntimeError(data.get("message", "unknown error"))
+    return data["lat"], data["lon"]
+
+
+def _fetch_coords_ipinfo():
+    """Lekérdezi a koordinátákat az ipinfo.io szolgáltatásból."""
+    headers = {"User-Agent": "LEDApp/1.0"}
+    response = requests.get("https://ipinfo.io/json", timeout=5, headers=headers)
+    response.raise_for_status()
+    data = response.json()
+    if "loc" not in data:
+        raise RuntimeError("loc missing")
+    lat_str, lon_str = data["loc"].split(",")
+    return float(lat_str), float(lon_str)
+
+
 def get_coordinates():
-    """Megpróbálja lekérni a koordinátákat IP alapján."""
-    try:
-        log_event("Koordináták lekérése (ip-api.com)...")
-        # Növelt timeout és User-Agent beállítása
-        headers = {"User-Agent": "LEDApp/1.0"}
-        response = requests.get("http://ip-api.com/json/", timeout=10, headers=headers)
-        response.raise_for_status()  # Hibát dob HTTP hibakód esetén
-        data = response.json()
-        if data.get("status") == "success":
-            lat = data["lat"]
-            lon = data["lon"]
+    """Megpróbálja lekérni a koordinátákat több forrásból."""
+    for fetcher, name in (
+        (_fetch_coords_ipapi, "ip-api.com"),
+        (_fetch_coords_ipinfo, "ipinfo.io"),
+    ):
+        try:
+            log_event(f"Koordináták lekérése ({name})...")
+            lat, lon = fetcher()
             log_event(f"Koordináták sikeresen lekérve: Lat={lat}, Lon={lon}")
             return lat, lon, True
-        else:
-            log_event(f"Figyelmeztetés: ip-api.com nem 'success' státuszt adott vissza: {data.get('message', 'N/A')}")
-            return BUDAPEST_COORDS[0], BUDAPEST_COORDS[1], False
-    except requests.exceptions.Timeout:
-        log_event("Hiba: Timeout a koordináták lekérése közben.")
-        # traceback.print_exc() # Opcionális: Teljes traceback
-        return BUDAPEST_COORDS[0], BUDAPEST_COORDS[1], False
-    except requests.exceptions.RequestException as e:
-        log_event(f"Hiba a koordináták lekérése közben (RequestException): {e}")
-        # traceback.print_exc() # Opcionális: Teljes traceback
-        return BUDAPEST_COORDS[0], BUDAPEST_COORDS[1], False
-    except Exception as e:
-        log_event(f"Váratlan hiba a koordináták lekérése közben: {e}")
-        log_event(f"Traceback:\n{traceback.format_exc()}")  # Itt írjuk ki a teljes tracebacket
-        return BUDAPEST_COORDS[0], BUDAPEST_COORDS[1], False
+        except Exception as e:
+            log_event(f"Hiba a {name} szolgáltatásból: {e}")
+    log_event("Minden helymeghatározási próbálkozás sikertelen, alapértelmezett koordináták használata")
+    log_event(f"Traceback:\n{traceback.format_exc()}")
+    return BUDAPEST_COORDS[0], BUDAPEST_COORDS[1], False
 
 
 def get_sun_times(lat, lon, now=None):
