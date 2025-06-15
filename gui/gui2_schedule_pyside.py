@@ -41,6 +41,7 @@ try:
     from gui import gui2_schedule_logic as logic
     from gui.gui2_controls_pyside import GUI2_ControlsWidget
     from gui.custom_color_dialog import CustomColorDialog
+    from gui.timeline_widget import TimelineWidget
 
     logic.LOCAL_TZ = LOCAL_TZ
     log_event("GUI2Schedule: Szükséges modulok sikeresen importálva.")
@@ -274,6 +275,10 @@ class GUI2_Widget(QWidget):
 
         main_layout.addLayout(profile_container)
 
+        # Timeline visualization for all active profiles
+        self.timeline_widget = TimelineWidget(self.main_app)
+        main_layout.addWidget(self.timeline_widget)
+
         # --- Ütemező Táblázat (GroupBox nélkül) ---
         table_container = QWidget()
         table_layout = QGridLayout(table_container)
@@ -395,7 +400,7 @@ class GUI2_Widget(QWidget):
         reset_button.clicked.connect(self.reset_schedule_gui)
         schedule_action_layout.addWidget(reset_button)  # Gombok jobb oldalon
         save_button = QPushButton("Mentés")
-        save_button.clicked.connect(lambda: logic.save_profile(self))
+        save_button.clicked.connect(self.save_profile_slot)
         schedule_action_layout.addWidget(save_button)
 
         main_layout.addLayout(schedule_action_layout)  # Hozzáadás a fő layout-hoz
@@ -434,12 +439,23 @@ class GUI2_Widget(QWidget):
             self.update_time_timer.stop()
         if hasattr(self, "check_schedule_timer"):
             self.check_schedule_timer.stop()
+        if hasattr(self, "timeline_widget") and hasattr(self.timeline_widget, "timer"):
+            self.timeline_widget.timer.stop()
         log_event("GUI2 Timers stopped.")
 
     @Slot()
     def mark_unsaved(self):
         """Jelzi, hogy módosítás történt a jelenlegi profilon."""
         self.unsaved_changes = self.is_schedule_modified()
+        if hasattr(self, "timeline_widget"):
+            self.timeline_widget.refresh()
+
+    @Slot()
+    def save_profile_slot(self):
+        """Saves profile then refreshes the timeline widget."""
+        logic.save_profile(self)
+        if hasattr(self, "timeline_widget"):
+            self.timeline_widget.refresh()
 
     def is_schedule_modified(self):
         """Összehasonlítja a jelenlegi beállításokat a mentett profillal."""
@@ -518,6 +534,8 @@ class GUI2_Widget(QWidget):
         self.profile_active_checkbox.blockSignals(True)
         self.profile_active_checkbox.setChecked(self.main_app.profiles[name].get("active", True))
         self.profile_active_checkbox.blockSignals(False)
+        if hasattr(self, "timeline_widget"):
+            self.timeline_widget.refresh()
 
     @Slot()
     def add_profile(self):

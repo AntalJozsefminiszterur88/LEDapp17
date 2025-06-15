@@ -185,6 +185,92 @@ def check_profile_conflicts(main_app, target_name):
     return conflicts
 
 
+def get_profile_day_intervals(main_app, profile_name):
+    """Return schedule intervals in minutes for drawing a timeline."""
+
+    profile = main_app.profiles.get(profile_name)
+    if not profile:
+        return {}
+
+    result = {}
+    schedule = profile.get("schedule", {})
+    today = datetime.now(LOCAL_TZ).date()
+    today_idx = today.weekday()
+
+    for idx, day in enumerate(DAYS):
+        data = schedule.get(day, {})
+        intervals = []
+        ref_date = today + timedelta(days=(idx - today_idx) % 7)
+        on_dt, off_dt = None, None
+
+        if data.get("sunrise"):
+            sr, _ = get_sun_times(main_app.latitude, main_app.longitude, datetime.combine(ref_date, dt_time()))
+            if sr:
+                try:
+                    on_dt = sr + timedelta(minutes=int(data.get("sunrise_offset", 0)))
+                except Exception:
+                    on_dt = sr
+        else:
+            on_str = data.get("on_time")
+            if on_str:
+                try:
+                    on_dt = LOCAL_TZ.localize(datetime.combine(ref_date, dt_time.fromisoformat(on_str)))
+                except Exception:
+                    pass
+
+        if data.get("sunset"):
+            _, ss = get_sun_times(main_app.latitude, main_app.longitude, datetime.combine(ref_date, dt_time()))
+            if ss:
+                try:
+                    off_dt = ss + timedelta(minutes=int(data.get("sunset_offset", 0)))
+                except Exception:
+                    off_dt = ss
+        else:
+            off_str = data.get("off_time")
+            if off_str:
+                try:
+                    off_dt = LOCAL_TZ.localize(datetime.combine(ref_date, dt_time.fromisoformat(off_str)))
+                except Exception:
+                    pass
+
+        if on_dt and off_dt:
+            if off_dt <= on_dt:
+                off_dt += timedelta(days=1)
+
+            start_min = on_dt.hour * 60 + on_dt.minute
+            end_min = off_dt.hour * 60 + off_dt.minute
+
+            color_name = data.get("color", "")
+            color_hex = next((c[1] for c in COLORS if c[0] == color_name), "#ffffff")
+
+            if end_min > 24 * 60:
+                intervals.append((start_min, 24 * 60, color_hex))
+                intervals.append((0, end_min - 24 * 60, color_hex))
+            else:
+                intervals.append((start_min, end_min, color_hex))
+
+        result[day] = intervals
+
+    return result
+
+
+def get_all_active_profiles_day_intervals(main_app):
+    """Collect intervals of all active profiles for each day."""
+
+    combined = {day: [] for day in DAYS}
+    for name, profile in main_app.profiles.items():
+        if not profile.get("active", False):
+            continue
+        intervals = get_profile_day_intervals(main_app, name)
+        for day in DAYS:
+            combined[day].extend(intervals.get(day, []))
+
+    for day in DAYS:
+        combined[day].sort(key=lambda x: x[0])
+
+    return combined
+
+
 def save_profile(gui_widget):
     """
     Elmenti az aktuális ütemezési beállításokat JSON fájlba a GUI widgetek alapján.
