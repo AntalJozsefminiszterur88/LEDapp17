@@ -287,7 +287,9 @@ class GUI2_Widget(QWidget):
 
         # Timeline visualization (shows all profiles)
         self.timeline_widget = TimelineWidget(self.main_app)
+        main_layout.addSpacing(15)
         main_layout.addWidget(self.timeline_widget)
+        main_layout.addSpacing(15)
 
         # --- Ütemező Táblázat (GroupBox nélkül) ---
         table_container = QWidget()
