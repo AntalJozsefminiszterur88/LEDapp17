@@ -254,6 +254,16 @@ def get_profile_day_intervals(main_app, profile_name):
     return result
 
 
+def get_all_profiles_day_intervals(main_app):
+    """Return combined schedule intervals for all profiles."""
+    combined = {day: [] for day in DAYS}
+    for name in getattr(main_app, "profiles", {}):
+        prof_intervals = get_profile_day_intervals(main_app, name)
+        for day, intervals in prof_intervals.items():
+            combined[day].extend(intervals)
+    return combined
+
+
 def save_profile(gui_widget):
     """
     Elmenti az aktuális ütemezési beállításokat JSON fájlba a GUI widgetek alapján.
