@@ -10,7 +10,7 @@ from PySide6.QtWidgets import QMessageBox
 
 # Importáljuk a szükséges konfigurációs és backend/core elemeket
 from config import COLORS, DAYS, CONFIG_FILE, PROFILES_FILE
-from core.sun_logic import DAYS_HU
+from core.sun_logic import DAYS_HU, get_local_sun_info as _core_get_local_sun_info
 from core.location_utils import get_sun_times  # noqa: F401
 
 # --- Időzóna Definíció ---
@@ -34,6 +34,11 @@ except Exception as e:
     LOCAL_TZ = pytz.utc
 
 # --- Logika Függvények ---
+
+
+def get_local_sun_info():
+    """Wrapper around core.sun_logic.get_local_sun_info."""
+    return _core_get_local_sun_info()
 
 
 def get_default_schedule():
@@ -349,7 +354,6 @@ def check_profiles(gui_widget):
                     continue
 
                 intervals.append((on_time_dt, off_time_dt, target_color_hex))
-
 
         if intervals:
             intervals.sort(key=lambda x: x[0])
