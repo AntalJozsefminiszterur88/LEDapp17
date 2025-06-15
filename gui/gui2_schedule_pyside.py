@@ -422,11 +422,7 @@ class GUI2_Widget(QWidget):
 
         schedule_action_layout.addStretch(1)  # Térkitöltő középen
 
-        reset_button = QPushButton("Alaphelyzet")
-        reset_button.clicked.connect(self.reset_schedule_gui)
-        schedule_action_layout.addWidget(reset_button)
-
-        # Mentés és Vissza gombok egymás alatt jobbra
+        # Mentés gomb felül, alatta egy sorban Alaphelyzet és Vissza
         save_back_layout = QVBoxLayout()
         save_back_layout.setAlignment(Qt.AlignmentFlag.AlignRight)
 
@@ -434,13 +430,22 @@ class GUI2_Widget(QWidget):
         save_button.clicked.connect(self.save_profile_slot)
         save_back_layout.addWidget(save_button)
 
+        reset_back_row = QHBoxLayout()
+        reset_back_row.setAlignment(Qt.AlignmentFlag.AlignRight)
+
+        reset_button = QPushButton("Alaphelyzet")
+        reset_button.clicked.connect(self.reset_schedule_gui)
+        reset_back_row.addWidget(reset_button)
+
         back_button = QPushButton("Vissza")
         try:
             back_button.clicked.connect(self.main_app.gui_manager.load_gui1)
         except AttributeError as e:
             log_event(f"HIBA a Vissza gomb connect során: {e}.")
             back_button.setEnabled(False)
-        save_back_layout.addWidget(back_button)
+        reset_back_row.addWidget(back_button)
+
+        save_back_layout.addLayout(reset_back_row)
 
         schedule_action_layout.addLayout(save_back_layout)
 
