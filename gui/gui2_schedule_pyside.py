@@ -729,9 +729,11 @@ class GUI2_Widget(QWidget):
 
         if is_checked:
             time_combo.setEnabled(False)
+            time_combo.setStyleSheet("color: gray; background-color: lightgray;")
             offset_entry.setEnabled(True)
         else:
             time_combo.setEnabled(True)
+            time_combo.setStyleSheet("")
             offset_entry.setEnabled(False)
 
     @Slot()
