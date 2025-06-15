@@ -198,7 +198,8 @@ class GuiManager:
 
         self.clear_window_content()  # Ez most GUI1-et töröl, nem állít le loopot
         self.app.setWindowTitle(f"LED-Irányító 2000 - {self.app.selected_device[0]}")
-        self.app.resize(1080, 864)
+        # Reduced default size so the window fits on smaller screens
+        self.app.resize(800, 700)
 
         widget = GUI2_Widget(self.app)  # Fő app példány átadása
         self.main_layout.addWidget(widget)

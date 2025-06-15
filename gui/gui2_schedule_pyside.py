@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QMessageBox,
     QInputDialog,  # QGroupBox eltávolítva
+    QScrollArea,
 )
 from PySide6.QtCore import Qt, QTimer, Slot
 from PySide6.QtGui import QFont
@@ -133,8 +134,17 @@ class GUI2_Widget(QWidget):
         self.setObjectName("GUI2_Widget_Instance")
         self.main_app = main_app
 
+        # --- Scrollable content area ---
+        outer_layout = QVBoxLayout(self)
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        outer_layout.addWidget(scroll_area)
+
+        scroll_content = QWidget()
+        scroll_area.setWidget(scroll_content)
+
         # --- Fő vertikális layout ---
-        main_layout = QVBoxLayout(self)
+        main_layout = QVBoxLayout(scroll_content)
         main_layout.setContentsMargins(10, 5, 10, 10)  # Kisebb felső margó
         main_layout.setSpacing(5)  # Kisebb alap térköz
 
