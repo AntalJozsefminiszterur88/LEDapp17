@@ -20,6 +20,14 @@ def setup_pyside(monkeypatch):
     monkeypatch.setitem(sys.modules, "PySide6", pyside)
     monkeypatch.setitem(sys.modules, "PySide6.QtWidgets", widgets)
     monkeypatch.setitem(sys.modules, "PySide6.QtCore", core)
+    # minimal pytz substitute
+    tz = types.SimpleNamespace(zone="UTC")
+    pytz_dummy = types.SimpleNamespace(
+        timezone=lambda x: types.SimpleNamespace(zone=x),
+        UnknownTimeZoneError=Exception,
+        utc=tz,
+    )
+    monkeypatch.setitem(sys.modules, "pytz", pytz_dummy)
     monkeypatch.setitem(
         sys.modules,
         "core.sun_logic",

@@ -18,9 +18,31 @@ except ImportError:
 
 
 class BLEController:
+    BLUETOOTH_OFF_WINERRORS = {-2147020577}
+    BLUETOOTH_OFF_STRINGS = [
+        "bluetooth adapter is off",
+        "bluetooth is turned off",
+        "org.bluez.error.notready",
+        "das gerät kann nicht verwendet werden",
+        "device not ready",
+    ]
+
     def __init__(self):
         self.client = None
         self._connection_lock = asyncio.Lock()
+
+    def _is_bluetooth_off_error(self, exc: Exception) -> bool:
+        """Heurisztikusan megállapítja, hogy a kivétel a Bluetooth kikapcsolt
+        állapotára utal-e."""
+        msg = str(exc).lower()
+        if isinstance(exc, OSError):
+            winerr = getattr(exc, "winerror", None)
+            if winerr in self.BLUETOOTH_OFF_WINERRORS:
+                return True
+        for s in self.BLUETOOTH_OFF_STRINGS:
+            if s in msg:
+                return True
+        return False
 
     async def scan(self):
         """Eszközök keresése (bővített logolással)."""
@@ -47,6 +69,10 @@ class BLEController:
         except Exception as e:
             log_event(f"BLEController: Error during scan execution: {e}")  # <<< ÚJ LOG >>>
             log_event(f"Traceback:\n{traceback.format_exc()}")  # <<< ÚJ LOG >>>
+            if self._is_bluetooth_off_error(e):
+                raise RuntimeError(
+                    "A Bluetooth ki van kapcsolva vagy nem érhető el. Kapcsolja be, majd próbálja újra."
+                ) from e
             devices_list = []  # Hiba esetén üres lista
 
         log_event(f"BLEController: Returning {len(devices_list)} named devices to AsyncHelper.")  # <<< ÚJ LOG >>>
