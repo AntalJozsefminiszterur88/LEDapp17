@@ -127,6 +127,20 @@ except ImportError as e:
         LOCAL_TZ = pytz.utc
 
 
+class NoWheelComboBox(QComboBox):
+    """QComboBox that ignores mouse wheel events to prevent accidental changes."""
+
+    def wheelEvent(self, event):  # pragma: no cover - GUI behavior
+        event.ignore()
+
+
+class NoWheelLineEdit(QLineEdit):
+    """QLineEdit that ignores mouse wheel events to prevent accidental changes."""
+
+    def wheelEvent(self, event):  # pragma: no cover - GUI behavior
+        event.ignore()
+
+
 # --- Osztály Definíció ---
 class GUI2_Widget(QWidget):
     def __init__(self, main_app, parent=None):
@@ -252,7 +266,7 @@ class GUI2_Widget(QWidget):
         profile_container = QVBoxLayout()
         profile_layout = QHBoxLayout()
         profile_label = QLabel("Profil:")
-        self.profile_combo = QComboBox()
+        self.profile_combo = NoWheelComboBox()
         self.profile_combo.addItems(list(self.main_app.profiles.keys()))
         self.profile_combo.setCurrentText(self.current_profile_name)
         self.profile_combo.currentTextChanged.connect(self.change_profile)
@@ -321,7 +335,7 @@ class GUI2_Widget(QWidget):
                 0,
                 Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
             )
-            color_cb = QComboBox()
+            color_cb = NoWheelComboBox()
             color_cb.addItems(color_display_names)
             saved_color = schedule_data.get("color", "")
             color_cb.setCurrentIndex(color_display_names.index(saved_color) if saved_color in valid_color_names else 0)
@@ -329,7 +343,7 @@ class GUI2_Widget(QWidget):
             table_layout.addWidget(color_cb, row, 1)
             day_widgets["color"] = color_cb
             time_values = [""] + [f"{h:02d}:{m:02d}" for h in range(24) for m in range(0, 60, 5)]
-            on_time_cb = QComboBox()
+            on_time_cb = NoWheelComboBox()
             on_time_cb.addItems(time_values)
             on_time_cb.setEditable(True)
             on_time_cb.setCurrentText(schedule_data.get("on_time", ""))
@@ -338,7 +352,7 @@ class GUI2_Widget(QWidget):
             table_layout.addWidget(on_time_cb, row, 2, Qt.AlignmentFlag.AlignCenter)
             day_widgets["on_time"] = on_time_cb
             self.time_comboboxes.append(on_time_cb)
-            off_time_cb = QComboBox()
+            off_time_cb = NoWheelComboBox()
             off_time_cb.addItems(time_values)
             off_time_cb.setEditable(True)
             off_time_cb.setCurrentText(schedule_data.get("off_time", ""))
@@ -357,7 +371,7 @@ class GUI2_Widget(QWidget):
                     self.toggle_sun_time(state, idx, d, "sunrise"),
                 )
             )
-            sunrise_offset_entry = QLineEdit(str(schedule_data.get("sunrise_offset", 0)))
+            sunrise_offset_entry = NoWheelLineEdit(str(schedule_data.get("sunrise_offset", 0)))
             sunrise_offset_entry.setFixedWidth(40)
             sunrise_offset_entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
             sunrise_offset_entry.textChanged.connect(self.mark_unsaved)
@@ -373,7 +387,7 @@ class GUI2_Widget(QWidget):
                     self.toggle_sun_time(state, idx, d, "sunset"),
                 )
             )
-            sunset_offset_entry = QLineEdit(str(schedule_data.get("sunset_offset", 0)))
+            sunset_offset_entry = NoWheelLineEdit(str(schedule_data.get("sunset_offset", 0)))
             sunset_offset_entry.setFixedWidth(40)
             sunset_offset_entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
             sunset_offset_entry.textChanged.connect(self.mark_unsaved)
