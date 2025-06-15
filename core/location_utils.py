@@ -54,12 +54,36 @@ def _fetch_coords_ipwhois():
     return data["latitude"], data["longitude"]
 
 
+def _fetch_coords_ipapico():
+    """Lekérdezi a koordinátákat az ipapi.co szolgáltatásból."""
+    headers = {"User-Agent": "LEDApp/1.0"}
+    response = requests.get("https://ipapi.co/json/", timeout=5, headers=headers)
+    response.raise_for_status()
+    data = response.json()
+    if "latitude" not in data or "longitude" not in data:
+        raise RuntimeError("latitude/longitude missing")
+    return data["latitude"], data["longitude"]
+
+
+def _fetch_coords_geolocationdb():
+    """Lekérdezi a koordinátákat a geolocation-db.com szolgáltatásból."""
+    headers = {"User-Agent": "LEDApp/1.0"}
+    response = requests.get("https://geolocation-db.com/json/", timeout=5, headers=headers)
+    response.raise_for_status()
+    data = response.json()
+    if "latitude" not in data or "longitude" not in data:
+        raise RuntimeError("latitude/longitude missing")
+    return float(data["latitude"]), float(data["longitude"])
+
+
 def get_coordinates():
     """Megpróbálja lekérni a koordinátákat több forrásból."""
     for fetcher, name in (
         (_fetch_coords_ipapi, "ip-api.com"),
         (_fetch_coords_ipinfo, "ipinfo.io"),
         (_fetch_coords_ipwhois, "ipwho.is"),
+        (_fetch_coords_ipapico, "ipapi.co"),
+        (_fetch_coords_geolocationdb, "geolocation-db.com"),
     ):
         try:
             log_event(f"Koordináták lekérése ({name})...")
