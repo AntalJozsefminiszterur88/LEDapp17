@@ -9,12 +9,11 @@ from gui import gui2_schedule_logic as logic
 
 
 class TimelineWidget(QWidget):
-    """Simple timeline visualization of daily schedule intervals."""
+    """Timeline visualization showing schedules from all profiles."""
 
-    def __init__(self, main_app, profile_name=None, parent=None):
+    def __init__(self, main_app, parent=None):
         super().__init__(parent)
         self.main_app = main_app
-        self.profile_name = profile_name
         self.intervals = {}
         self.setMinimumHeight(160)
 
@@ -22,23 +21,19 @@ class TimelineWidget(QWidget):
         self.timer.timeout.connect(self.update)
         self.timer.start(60_000)  # refresh every minute
 
-        self.refresh(profile_name)
+        self.refresh()
 
-    def refresh(self, profile_name=None):
-        """Reload intervals for the given profile and repaint."""
-        if profile_name is not None:
-            self.profile_name = profile_name
-        if not self.profile_name:
-            self.intervals = {}
-        else:
-            self.intervals = logic.get_profile_day_intervals(self.main_app, self.profile_name)
+    def refresh(self):
+        """Reload intervals for all profiles and repaint."""
+        self.intervals = logic.get_all_profiles_day_intervals(self.main_app)
         self.update()
 
     def paintEvent(self, event):
         painter = QPainter(self)
         left_margin = 60
         top_margin = 5
-        row_height = max(20, (self.height() - top_margin * 2) // len(DAYS))
+        bottom_margin = 20
+        row_height = max(20, (self.height() - top_margin - bottom_margin) // len(DAYS))
         width = self.width() - left_margin - 10
 
         painter.fillRect(self.rect(), self.palette().window())
@@ -48,6 +43,8 @@ class TimelineWidget(QWidget):
         for h in range(25):
             x = left_margin + width * h / 24
             painter.drawLine(int(x), top_margin, int(x), top_margin + row_height * len(DAYS))
+            if h % 2 == 0:
+                painter.drawText(int(x) - 10, top_margin + row_height * len(DAYS) + 15, f"{h:02d}")
         for i, day in enumerate(DAYS):
             y = top_margin + i * row_height
             painter.drawText(5, y + row_height * 0.7, day)

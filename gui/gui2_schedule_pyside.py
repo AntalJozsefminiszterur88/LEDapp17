@@ -275,8 +275,8 @@ class GUI2_Widget(QWidget):
 
         main_layout.addLayout(profile_container)
 
-        # Timeline visualization
-        self.timeline_widget = TimelineWidget(self.main_app, self.current_profile_name)
+        # Timeline visualization (shows all profiles)
+        self.timeline_widget = TimelineWidget(self.main_app)
         main_layout.addWidget(self.timeline_widget)
 
         # --- Ütemező Táblázat (GroupBox nélkül) ---
@@ -448,14 +448,14 @@ class GUI2_Widget(QWidget):
         """Jelzi, hogy módosítás történt a jelenlegi profilon."""
         self.unsaved_changes = self.is_schedule_modified()
         if hasattr(self, "timeline_widget"):
-            self.timeline_widget.refresh(self.current_profile_name)
+            self.timeline_widget.refresh()
 
     @Slot()
     def save_profile_slot(self):
         """Saves profile then refreshes the timeline widget."""
         logic.save_profile(self)
         if hasattr(self, "timeline_widget"):
-            self.timeline_widget.refresh(self.current_profile_name)
+            self.timeline_widget.refresh()
 
     def is_schedule_modified(self):
         """Összehasonlítja a jelenlegi beállításokat a mentett profillal."""
@@ -535,7 +535,7 @@ class GUI2_Widget(QWidget):
         self.profile_active_checkbox.setChecked(self.main_app.profiles[name].get("active", True))
         self.profile_active_checkbox.blockSignals(False)
         if hasattr(self, "timeline_widget"):
-            self.timeline_widget.refresh(self.current_profile_name)
+            self.timeline_widget.refresh()
 
     @Slot()
     def add_profile(self):
