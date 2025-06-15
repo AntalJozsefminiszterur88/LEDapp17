@@ -21,11 +21,13 @@ try:
         import tzlocal
 
         LOCAL_TZ = tzlocal.get_localzone()
-        print(f"Helyi időzóna (tzlocal - logic): {LOCAL_TZ.zone}")
+        tz_name = getattr(LOCAL_TZ, "zone", getattr(LOCAL_TZ, "key", "Ismeretlen"))
+        print(f"Helyi időzóna (tzlocal - logic): {tz_name}")
     except ImportError:
         # Ha a tzlocal nincs telepítve, maradunk a fixnél
         LOCAL_TZ = pytz.timezone("Europe/Budapest")
-        print(f"Helyi időzóna (fix - logic): {LOCAL_TZ.zone}")
+        tz_name = getattr(LOCAL_TZ, "zone", getattr(LOCAL_TZ, "key", "Ismeretlen"))
+        print(f"Helyi időzóna (fix - logic): {tz_name}")
 except pytz.UnknownTimeZoneError:
     print("Figyelmeztetés: Helyi időzóna nem található. UTC használata (logic).")
     LOCAL_TZ = pytz.utc

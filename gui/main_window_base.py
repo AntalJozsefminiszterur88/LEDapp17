@@ -69,12 +69,14 @@ try:
     import tzlocal
 
     LOCAL_TZ = tzlocal.get_localzone()
-    log_event(f"Helyi időzóna (tzlocal): {LOCAL_TZ.zone if LOCAL_TZ else 'Ismeretlen'}")
+    tz_name = getattr(LOCAL_TZ, "zone", getattr(LOCAL_TZ, "key", "Ismeretlen"))
+    log_event(f"Helyi időzóna (tzlocal): {tz_name}")
 except Exception:
     log_event("tzlocal nem található vagy hiba történt, 'Europe/Budapest' használata.")
     try:
         LOCAL_TZ = pytz.timezone("Europe/Budapest")
-        log_event(f"Helyi időzóna (fix): {LOCAL_TZ.zone}")
+        tz_name = getattr(LOCAL_TZ, "zone", getattr(LOCAL_TZ, "key", "Ismeretlen"))
+        log_event(f"Helyi időzóna (fix): {tz_name}")
     except pytz.UnknownTimeZoneError:
         log_event("Figyelmeztetés: 'Europe/Budapest' időzóna sem található. UTC használata.")
         LOCAL_TZ = pytz.utc
