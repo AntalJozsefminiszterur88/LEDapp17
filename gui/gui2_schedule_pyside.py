@@ -283,7 +283,17 @@ class GUI2_Widget(QWidget):
         add_profile_btn.setObjectName("addProfileButton")
         add_profile_btn.setFixedSize(80, 25)
         add_profile_btn.clicked.connect(self.add_profile)
-        profile_container.addWidget(add_profile_btn, 0, Qt.AlignmentFlag.AlignLeft)
+
+        custom_color_btn = QPushButton("Egyedi szín")
+        custom_color_btn.setObjectName("customColorButton")
+        custom_color_btn.setFixedSize(100, 25)
+        custom_color_btn.clicked.connect(self.open_custom_colors)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addWidget(add_profile_btn)
+        btn_layout.addWidget(custom_color_btn)
+        btn_layout.addStretch(1)
+        profile_container.addLayout(btn_layout)
 
         delete_profile_btn = QPushButton("Profil törlése")
         delete_profile_btn.setObjectName("deleteProfileButton")
@@ -291,17 +301,11 @@ class GUI2_Widget(QWidget):
         delete_profile_btn.clicked.connect(self.delete_profile)
         profile_container.addWidget(delete_profile_btn, 0, Qt.AlignmentFlag.AlignLeft)
 
-        custom_color_btn = QPushButton("Egyedi szín")
-        custom_color_btn.setObjectName("customColorButton")
-        custom_color_btn.setFixedSize(100, 25)
-        custom_color_btn.clicked.connect(self.open_custom_colors)
-        profile_container.addWidget(custom_color_btn, 0, Qt.AlignmentFlag.AlignLeft)
-
         main_layout.addLayout(profile_container)
 
         # Timeline visualization (shows all profiles)
         self.timeline_widget = TimelineWidget(self.main_app)
-        main_layout.addSpacing(15)
+        main_layout.addSpacing(25)
         main_layout.addWidget(self.timeline_widget)
         main_layout.addSpacing(15)
 
