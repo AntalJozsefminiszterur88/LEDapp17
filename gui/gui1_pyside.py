@@ -149,7 +149,9 @@ class GUI1_Widget(QWidget):
 
     @Slot(str)
     def on_scan_error(self, error_message):
-        self.progress_label.setText(f"Hiba: {error_message}")
+        # Avoid resizing the main window by keeping this label short
+        # The detailed error is shown in the message box instead
+        self.progress_label.setText("Hiba a keresés során.")
         QMessageBox.critical(self, "Keresési Hiba", f"Hiba a keresés során:\n{error_message}")
 
     @Slot()
