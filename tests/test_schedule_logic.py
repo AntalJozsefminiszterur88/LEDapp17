@@ -77,3 +77,60 @@ def test_check_profile_conflicts(monkeypatch):
     )
     conflicts = glogic.check_profile_conflicts(app, "P1")
     assert "Hétfő - P2" in conflicts
+
+
+def test_check_profiles_turns_off_when_after_last_interval(monkeypatch):
+    setup_pyside(monkeypatch)
+    glogic = importlib.import_module("gui.gui2_schedule_logic")
+
+    class DummyTZ:
+        zone = "UTC"
+
+        def localize(self, dt):
+            from datetime import timezone
+
+            return dt.replace(tzinfo=timezone.utc)
+
+    from datetime import datetime as dt, timezone
+
+    fixed_now = dt(2023, 1, 2, 20, 0, tzinfo=timezone.utc)
+
+    class FixedDateTime(dt):
+        @classmethod
+        def now(cls, tz=None):
+            return fixed_now
+
+    monkeypatch.setattr(glogic, "datetime", FixedDateTime)
+    monkeypatch.setattr(glogic, "LOCAL_TZ", DummyTZ())
+    monkeypatch.setattr(
+        glogic,
+        "DAYS_HU",
+        {
+            "Monday": "Hétfő",
+            "Sunday": "Vasárnap",
+        },
+    )
+
+    schedule = glogic.get_default_schedule()
+    schedule["Hétfő"].update(
+        {"on_time": "08:00", "off_time": "09:00", "color": glogic.COLORS[0][0]}
+    )
+
+    main_app = types.SimpleNamespace(
+        profiles={"P1": {"active": True, "schedule": schedule}},
+        sunrise=None,
+        sunset=None,
+        is_led_on=True,
+        last_color_hex="dummy",
+    )
+    log = {}
+    controls = types.SimpleNamespace(
+        send_color_command=lambda *a, **k: log.setdefault("sent", True),
+        turn_off_led=lambda *a, **k: log.setdefault("off", True),
+    )
+    widget = types.SimpleNamespace(main_app=main_app, controls_widget=controls)
+
+    glogic.check_profiles(widget)
+
+    assert "sent" not in log
+    assert log.get("off")
