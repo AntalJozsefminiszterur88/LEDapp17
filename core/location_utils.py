@@ -43,11 +43,23 @@ def _fetch_coords_ipinfo():
     return float(lat_str), float(lon_str)
 
 
+def _fetch_coords_ipwhois():
+    """Lekérdezi a koordinátákat az ipwho.is szolgáltatásból."""
+    headers = {"User-Agent": "LEDApp/1.0"}
+    response = requests.get("https://ipwho.is/", timeout=5, headers=headers)
+    response.raise_for_status()
+    data = response.json()
+    if not data.get("success", False):
+        raise RuntimeError(data.get("message", "unknown error"))
+    return data["latitude"], data["longitude"]
+
+
 def get_coordinates():
     """Megpróbálja lekérni a koordinátákat több forrásból."""
     for fetcher, name in (
         (_fetch_coords_ipapi, "ip-api.com"),
         (_fetch_coords_ipinfo, "ipinfo.io"),
+        (_fetch_coords_ipwhois, "ipwho.is"),
     ):
         try:
             log_event(f"Koordináták lekérése ({name})...")
