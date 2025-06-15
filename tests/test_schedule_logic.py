@@ -77,3 +77,67 @@ def test_check_profile_conflicts(monkeypatch):
     )
     conflicts = glogic.check_profile_conflicts(app, "P1")
     assert "Hétfő - P2" in conflicts
+
+
+def test_check_profiles_cross_midnight(monkeypatch):
+    """Schedule spanning midnight should activate only during its interval."""
+    setup_pyside(monkeypatch)
+
+    # Use real pytz for timezone handling
+    sys.modules.pop("pytz", None)
+    import pytz
+    monkeypatch.setitem(sys.modules, "pytz", pytz)
+
+    glogic = importlib.import_module("gui.gui2_schedule_logic")
+    glogic = importlib.reload(glogic)
+
+    # Hungarian day names mapping
+    monkeypatch.setattr(
+        glogic,
+        "DAYS_HU",
+        {"Monday": "Hétfő", "Tuesday": "Kedd", "Sunday": "Vasárnap"},
+        raising=False,
+    )
+    monkeypatch.setattr(glogic, "LOCAL_TZ", pytz.timezone("Europe/Budapest"), raising=False)
+
+    schedule = glogic.get_default_schedule()
+    schedule["Hétfő"].update({"color": "Piros", "on_time": "22:00", "off_time": "02:00"})
+
+    main_app = types.SimpleNamespace(
+        profiles={"Test": {"active": True, "schedule": schedule}},
+        sunrise=None,
+        sunset=None,
+        is_led_on=False,
+        last_color_hex="",
+        latitude=0.0,
+        longitude=0.0,
+    )
+
+    class DummyControls:
+        def __init__(self):
+            self.sent = []
+            self.turned_off = False
+
+        def send_color_command(self, hex_code):
+            self.sent.append(hex_code)
+
+        def turn_off_led(self):
+            self.turned_off = True
+
+    controls = DummyControls()
+    gui = types.SimpleNamespace(main_app=main_app, controls_widget=controls)
+
+    from freezegun import freeze_time
+
+    # 23:00 local (22:00 UTC) should trigger the color
+    with freeze_time("2020-01-06 22:00:00", tz_offset=0):
+        glogic.check_profiles(gui)
+        assert controls.sent == [next(c[2] for c in config.COLORS if c[0] == "Piros")]
+
+    controls.sent.clear()
+    main_app.is_led_on = True
+
+    # 03:00 local (02:00 UTC) is outside the interval
+    with freeze_time("2020-01-07 02:00:00", tz_offset=0):
+        glogic.check_profiles(gui)
+        assert controls.sent == []
